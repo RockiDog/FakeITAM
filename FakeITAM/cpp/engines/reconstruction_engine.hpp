@@ -46,7 +46,8 @@ class ReconstructionEngine {
                                             utility::MemBlock<BlockAllocation>* allocation_type_out);
   void UpdateVoxelTsdfAndWeight(const utility::Vector2i& view_size_in,
                                 const utility::Matrix3f& intrinsics_in,
-                                const utility::Matrix4f& Tg_in,
+                                const utility::Matrix4f& Ti_g_in,
+                                const utility::Vector3f& camera_coordinates_in,
                                 const utility::MemBlock<float>& depth_in,
                                 const utility::Vector4f& point_g_in,
                                       int max_W, float mu,

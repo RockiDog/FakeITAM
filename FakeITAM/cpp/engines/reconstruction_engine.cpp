@@ -200,6 +200,8 @@ void ReconstructionEngine::IntegrateVoxelsToWorldScene(const View& view_in,
   Matrix3f intrinsic_mat {intrinsics.x, 0, intrinsics.z,
                           0, intrinsics.y, intrinsics.w,
                           0, 0, 1};
+  Matrix4f Ti_g = GetInverse(Tg);
+  Vector3f camera_coordinates = camera_pose_in.t();
 
   const MemBlock<BlockHashEntry>& hash_list = *(scene_out->index_->hash_list());
   const MemBlock<Voxel>& local_voxel_array = *(scene_out->local_voxel_array_);
@@ -220,7 +222,8 @@ void ReconstructionEngine::IntegrateVoxelsToWorldScene(const View& view_in,
           Vector4f point_g {voxel_g.x * gVoxelMetricSize,
                             voxel_g.y * gVoxelMetricSize,
                             voxel_g.z * gVoxelMetricSize, 1};
-          UpdateVoxelTsdfAndWeight(view_size, intrinsic_mat, Tg, depth, point_g,
+          UpdateVoxelTsdfAndWeight(view_size, intrinsic_mat, Ti_g,
+                                   camera_coordinates, depth, point_g,
                                    gTsdfMaxWeight, gTsdfBandWidthMu, &voxel);
         }
       }
@@ -271,13 +274,13 @@ bool ReconstructionEngine::IsVoxelVisible(const Vector4f& voxel_in,
 
 void ReconstructionEngine::UpdateVoxelTsdfAndWeight(const Vector2i& view_size_in,
                                                     const Matrix3f& intrinsics_in,
-                                                    const Matrix4f& Tg_in,
+                                                    const Matrix4f& Ti_g_in,
+                                                    const Vector3f& camera_coordinates_in,
                                                     const MemBlock<float>& depth_in,
                                                     const Vector4f& point_g_in,
                                                           int max_W, float mu,
                                                           Voxel* voxel_out) {
-  Matrix4f Ti_g = GetInverse(Tg_in);
-  Vector3f point_3d_l = (Ti_g * point_g_in).ProjectTo3d();
+  Vector3f point_3d_l = (Ti_g_in * point_g_in).ProjectTo3d();
   Vector2f point_2d = (intrinsics_in * point_3d_l).ProjectTo2d() / point_3d_l.z;
 
   Vector2i pixel(round(point_2d.x), round(point_2d.y));
@@ -292,8 +295,7 @@ void ReconstructionEngine::UpdateVoxelTsdfAndWeight(const Vector2i& view_size_in
   float fx = intrinsics_in(0, 0), fy = intrinsics_in(1, 1);
   float dx = intrinsics_in(0, 2), dy = intrinsics_in(1, 2);
   float lambda = Vector3f((pixel.x - dx)/fx, (pixel.y - dy)/fy, 1).GetNorm();
-  Vector3f tg = Vector3f(Tg_in(0, 3), Tg_in(1, 3), Tg_in(2, 3));
-  float eta = (tg - point_g_in.ProjectTo3d()).GetNorm() / lambda - depth;
+  float eta = (camera_coordinates_in - point_g_in.ProjectTo3d()).GetNorm() / lambda - depth;
   if (eta < -mu)
     return;
 
