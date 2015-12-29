@@ -1,0 +1,68 @@
+project(FakeITAM)
+cmake_minimum_required(VERSION 3.0)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g -ggdb")
+SET(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")
+
+include_directories(.)
+add_subdirectory(engines)
+add_subdirectory(engines/library)
+aux_source_directory(. DIR_SRCS)
+add_executable(Test ${DIR_SRCS})
+
+target_link_libraries(Test ENGINES LIBRARY)
+
+set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake) 
+
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+  find_package(OpenGL REQUIRED)
+  find_package(glut REQUIRED)
+  mark_as_advanced(OPENGL_LIBRARIES GLUT_LIBRARIES)
+
+  if(OPENGL_LIBRARIES)
+    message(STATUS "Found OpenGL: ${OPENGL_LIBRARIES}")
+    target_link_libraries(Test ${OPENGL_LIBRARIES})
+  else()
+    message(SEND_ERROR "OpenGL not found")
+  endif()
+
+  if(GLUT_LIBRARIES)
+    message(STATUS "Found glut: ${GLUT_LIBRARIES}")
+    target_link_libraries(Test ${GLUT_LIBRARIES})
+  else()
+    message(SEND_ERROR "glut not found")
+  endif()
+
+elseif(CMAKE_SYSTEM_NAME MATCHES "Linux")
+  find_package(libGL REQUIRED)
+  find_package(libGLU REQUIRED)
+  find_package(libglut REQUIRED)
+  mark_as_advanced(LIBGL_LIBRARIES LIBGLU_LIBRARIES LIBGLUT_LIBRARIES)
+
+  if(LIBGL_LIBRARIES)
+    message(STATUS "Found libGL: ${LIBGL_LIBRARIES}")
+    target_link_libraries(Test ${LIBGL_LIBRARIES})
+  else()
+    message(SEND_ERROR "libGL not found")
+  endif()
+
+  if(LIBGLU_LIBRARIES)
+    message(STATUS "Found libGLU: ${LIBGLU_LIBRARIES}")
+    target_link_libraries(Test ${LIBGLU_LIBRARIES})
+  else()
+    message(SEND_ERROR "libGLU not found")
+  endif()
+
+  if(LIBGLUT_LIBRARIES)
+    message(STATUS "Found libglut: ${LIBGLUT_LIBRARIES}")
+    target_link_libraries(Test ${LIBGLUT_LIBRARIES})
+  else()
+    message(SEND_ERROR "libglut not found")
+  endif()
+
+else()
+  message(SEND_ERROR "Unknown operating system")
+endif()
+
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
