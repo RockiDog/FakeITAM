@@ -24,7 +24,7 @@ struct CameraPose {
                               m(2, 0), m(2, 1), m(2, 2)};
   }
   utility::Vector3f t() const {
-    return utility::Vector3f {m(3, 0), m(3, 1), m(3, 2)};
+    return utility::Vector3f {m(0, 3), m(1, 3), m(2, 3)};
   }
 
   utility::Matrix4f m;
