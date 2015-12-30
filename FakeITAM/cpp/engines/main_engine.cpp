@@ -51,7 +51,7 @@ MainEngine::MainEngine(const char* calib_filename, ...) : flags_(gInitialization
   world_scene_ = new Scene(view_size_, gBlockHashOrderedArraySize, gBlockHashExcessListSize,
                            gBlockHashOrderedArraySize - 1, gBlockHashLocalNum, gVoxelBlockSizeC);
   camera_pose_ = new CameraPose;
-  point_cloud_ = new PointCloud(view_size_, MEM_CPU);
+  point_cloud_ = new PointCloud(view_size_, gRenderMaxPointCloudAge, MEM_CPU);
   if ((flags_ & USE_DEPTH_TRACKING) &&
       (flags_ & USE_COLOR_TRACKING) == 0 &&
       (flags_ & USE_FEATURES_TRACKING) == 0) {

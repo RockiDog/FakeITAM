@@ -9,7 +9,6 @@
 #ifndef FAKEITAM_CPP_ENGINES_LIBRARY_HPP_
 #define FAKEITAM_CPP_ENGINES_LIBRARY_HPP_
 
-#include "global_config.hpp"
 #include "engines/library/camera_pose.hpp"
 #include "engines/library/image_utils.hpp"
 #include "utilities/mem_block.hpp"
@@ -20,10 +19,12 @@ namespace engine {
 
 class PointCloud {
  public:
-  PointCloud(const utility::Vector2i& size, utility::MemDevice device)
-      : age_(config::gRenderMaxPointCloudAge), size_(size) {
+  PointCloud(const utility::Vector2i& size, int initial_age, utility::MemDevice device)
+      : age_(initial_age), size_(size) {
     locations_ = new utility::MemBlock<utility::Vector4f>(size_.x * size_.y, device);
     normals_ = new utility::MemBlock<utility::Vector4f>(size_.x * size_.y, device);
+    locations_->ResetData();
+    normals_->ResetData();
   }
 
   ~PointCloud() {
