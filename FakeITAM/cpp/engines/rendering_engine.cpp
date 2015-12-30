@@ -69,7 +69,7 @@ void RenderingEngine::ForwardProject(const Scene& scene_in,
   const Matrix4f& Tg = pose_in.m;
   const MemBlock<Vector4f>& points = *pcl_in.locations();
   const MemBlock<float>& depth_map = *view_in.depth_map;
-  PointCloud pcl(view_size, MEM_CPU);
+  PointCloud pcl(view_size, gRenderMaxPointCloudAge, MEM_CPU);
 
   const float fx = view_in.intrinsics.x;
   const float fy = view_in.intrinsics.y;
