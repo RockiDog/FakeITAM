@@ -106,9 +106,9 @@ void ViewManager::BilateralFilter(const ImageMono32f& data_in, ImageMono32f* dat
   int width = calibrator_.depth_width();
   int height = calibrator_.depth_height();
 
-  for (int i = kKernalSize / 2; i < height - kKernalSize / 2; ++i)
-    for (int j = kKernalSize / 2; j < width - kKernalSize / 2; ++j)
-      (*data_out)[i * width + j] = CalculateConvolution(data_in, i, j);
+  for (int row = 0; row < height; ++row)
+    for (int col = 0; col < width; ++col)
+      (*data_out)[row * width + col] = CalculateConvolution(data_in, row, col);
 }
 
 /* TODO Metal */

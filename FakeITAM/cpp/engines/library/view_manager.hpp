@@ -69,23 +69,30 @@ class ViewManager {
 
 inline float ViewManager::CalculateConvolution(const ImageMono32f& depth_in, int row, int col) {
   int width = calibrator_.depth_width();
+  int height = calibrator_.depth_height();
   float raw_z = depth_in[row * width + col];
   if (raw_z <= 0)
     return -1;
 
-  float sigma_z = 1 / (0.0012 + 0.0019 * pow((raw_z - 0.4), 2) + 0.0001 / sqrt(raw_z) * 0.25);
-  float z_sum = 0, w_sum = 0;
-  for (int i = -kKernalSize / 2; i <= kKernalSize / 2; ++i) {
-    for (int j = -kKernalSize / 2; j <= kKernalSize / 2; ++j) {
-      float z = depth_in[(row + i) * width + col + j];
-      if (z <= 0)
-        continue;
-      float w = exp(-0.5 * ((i+j)*kSigmaL*kSigmaL + z*z*sigma_z*sigma_z));
-      z_sum += z * w;
-      w_sum += w;
+  if (row >= kKernalSize / 2 && row < height - kKernalSize / 2 &&
+      col >= kKernalSize / 2 && col < width - kKernalSize / 2) {
+    float sigma_z = 1 / (0.0012 + 0.0019 * pow((raw_z - 0.4), 2) + 0.0001 / sqrt(raw_z) * 0.25);
+    float z_sum = 0, w_sum = 0;
+    for (int i = -kKernalSize / 2; i <= kKernalSize / 2; ++i) {
+      for (int j = -kKernalSize / 2; j <= kKernalSize / 2; ++j) {
+        float z = depth_in[(row + i) * width + col + j];
+        if (z <= 0)
+          continue;
+        float delta_z = z - raw_z;
+        float w = exp(-0.5 * ((abs(i) + abs(j)) * kSigmaL * kSigmaL + delta_z * delta_z * sigma_z * sigma_z));
+        z_sum += z * w;
+        w_sum += w;
+      }
     }
+    return z_sum / w_sum;
+  } else {
+    return depth_in[row * width + col];
   }
-  return z_sum / w_sum;
 }
 
 inline void ViewManager::CalculateNormal(const ImageMono32f& depth_in,
