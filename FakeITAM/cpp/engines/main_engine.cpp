@@ -48,6 +48,7 @@ MainEngine::MainEngine(const char* calib_filename, ...) : flags_(gInitialization
   view_manager_ = new ViewManager(*image_engine_->calibrator(), gViewKernalSize);
   view_size_.x = image_engine_->calibrator()->depth_width();
   view_size_.y = image_engine_->calibrator()->depth_height();
+  view_ = new View(nullptr, nullptr, view_size_, image_engine_->calibrator()->GetDepthIntrinsicVector());
   world_scene_ = new Scene(view_size_, gBlockHashOrderedArraySize, gBlockHashExcessListSize,
                            gBlockHashOrderedArraySize - 1, gBlockHashLocalNum, gVoxelBlockSizeC);
   camera_pose_ = new CameraPose;
@@ -82,10 +83,12 @@ MainEngine::~MainEngine() {
   rendering_engine_ = nullptr;
 
   delete view_manager_;
+  delete view_;
   delete world_scene_;
   delete camera_pose_;
   delete point_cloud_;
   view_manager_ = nullptr;
+  view_ = nullptr;
   world_scene_ = nullptr;
   camera_pose_ = nullptr;
   point_cloud_ = nullptr;
@@ -110,8 +113,8 @@ void MainEngine::ProcessOneFrame() throw(std::runtime_error) {
   /* Step 2: Construct current "View" */
   if (flags_ & USE_DEBUG_MODE)
     cout << "\tconstructing current view ... ... ..." << flush;
-  View view(rgb_frame, raw_disparity_map, view_size_, image_engine_->calibrator()->GetDepthIntrinsicVector());
-  this->view_manager_->UpdateView(&view);
+  view_->SetRGBDFrame(rgb_frame, raw_disparity_map);
+  this->view_manager_->UpdateView(view_);
   if (flags_ & USE_DEBUG_MODE)
     cout << " end" << endl;
 
@@ -124,7 +127,7 @@ void MainEngine::ProcessOneFrame() throw(std::runtime_error) {
         cout << "\trunning depth tracking ... ... ..." << flush;
       /* TODO Other tracking methods */
     }
-    this->tracking_engine_->TrackCamera(view, *point_cloud_, *camera_pose_, camera_pose_);
+    this->tracking_engine_->TrackCamera(*view_, *point_cloud_, *camera_pose_, camera_pose_);
     if (flags_ & USE_DEBUG_MODE)
       cout << " end" << endl;
   }
@@ -132,8 +135,8 @@ void MainEngine::ProcessOneFrame() throw(std::runtime_error) {
   /* Step 4: Reconstruct the world "Scene" */
   if (flags_ & USE_DEBUG_MODE)
     cout << "\treconstructing world scene ... ... ..." << flush;
-  this->reconstruction_engine_->AllocateWorldSceneFromView(view, *camera_pose_, world_scene_);
-  this->reconstruction_engine_->IntegrateVoxelsToWorldScene(view, *camera_pose_, world_scene_);
+  this->reconstruction_engine_->AllocateWorldSceneFromView(*view_, *camera_pose_, world_scene_);
+  this->reconstruction_engine_->IntegrateVoxelsToWorldScene(*view_, *camera_pose_, world_scene_);
   if (flags_ & USE_DEBUG_MODE)
     cout << " end" << endl;
 
@@ -151,18 +154,18 @@ void MainEngine::ProcessOneFrame() throw(std::runtime_error) {
     if (require_full_rendering) {
       if (flags_ & USE_DEBUG_MODE)
         cout << "\tprocessing full raycasting ... ... ..." << flush;
-      this->rendering_engine_->FullRenderIcpMaps(*world_scene_, view, *camera_pose_, point_cloud_);
+      this->rendering_engine_->FullRenderIcpMaps(*world_scene_, *view_, *camera_pose_, point_cloud_);
       point_cloud_->ResetAge();
     } else {
       if (flags_ & USE_DEBUG_MODE)
         cout << "\tprocessing forward projection ... ... ..." << flush;
-      this->rendering_engine_->ForwardProject(*world_scene_, view, *camera_pose_, *point_cloud_, point_cloud_);
+      this->rendering_engine_->ForwardProject(*world_scene_, *view_, *camera_pose_, *point_cloud_, point_cloud_);
       point_cloud_->IncreaseAge();
     }
   } else {
     if (flags_ & USE_DEBUG_MODE)
       cout << "\tprocessing full raycasting ... ... ..." << flush;
-    this->rendering_engine_->FullRenderIcpMaps(*world_scene_, view, *camera_pose_, point_cloud_);
+    this->rendering_engine_->FullRenderIcpMaps(*world_scene_, *view_, *camera_pose_, point_cloud_);
     point_cloud_->ResetAge();
   }
   if (flags_ & USE_DEBUG_MODE)

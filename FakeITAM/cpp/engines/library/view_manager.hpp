@@ -25,6 +25,8 @@ struct View {
   View(const View& other);
   ~View();
 
+  void SetRGBDFrame(const ImageRGB8u* rgb_image_in, const ImageMono16u* disparity_map_in);
+
   /* Input rgb image & depth map */
   const ImageRGB8u* rgb_image;
   const ImageMono16u* disparity_map;
@@ -34,8 +36,8 @@ struct View {
   ImageMono32f* depth_weights;
   NormalXYZW32f* normal_map;
 
-  utility::Vector2i size;
-  utility::Vector4f intrinsics;
+  const utility::Vector2i size;
+  const utility::Vector4f intrinsics;
 
  private:
   View& operator=(const View&);

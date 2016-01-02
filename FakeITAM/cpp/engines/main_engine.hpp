@@ -38,6 +38,7 @@ class MainEngine {
   const RenderingEngine* GetRenderingEngine() const { return rendering_engine_; }
 
   const ViewManager* view_manager() const { return view_manager_; }
+  const View* view() const { return view_; }
   const Scene* world_scene() const { return world_scene_; }
   const CameraPose* camera_pose() const { return camera_pose_; }
   const PointCloud* point_cloud() const { return point_cloud_; }
@@ -55,6 +56,7 @@ class MainEngine {
   RenderingEngine* rendering_engine_;
 
   ViewManager* view_manager_;
+  View* view_;
   Scene* world_scene_;
   CameraPose* camera_pose_;
   PointCloud* point_cloud_;

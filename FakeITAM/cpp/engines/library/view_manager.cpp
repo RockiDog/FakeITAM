@@ -60,6 +60,20 @@ View::~View() {
   normal_map = nullptr;
 }
 
+void View::SetRGBDFrame(const ImageRGB8u* rgb_image, const ImageMono16u* disparity_map) {
+  if (rgb_image != nullptr)
+    this->rgb_image = rgb_image;
+  if (disparity_map != nullptr) {
+    this->disparity_map = disparity_map;
+    if (depth_map == nullptr)
+      depth_map = new ImageMono32f(disparity_map->element_n(), MEM_CPU);
+    if (depth_weights == nullptr)
+      depth_weights = new ImageMono32f(disparity_map->element_n(), MEM_CPU);
+    if (normal_map == nullptr)
+      normal_map = new NormalXYZW32f(disparity_map->element_n(), MEM_CPU);
+  }
+}
+
 void ViewManager::UpdateView(View* view) {
   const ImageMono16u* disparity_map = view->disparity_map;
   ImageMono32f* raw_depth_map = view->depth_map;
