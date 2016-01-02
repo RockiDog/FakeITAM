@@ -45,6 +45,8 @@ RGBDCalibrator::RGBDCalibrator(const char* calib_filename)
   ex(3, 0) = ex(3, 1) = ex(3, 2) = 0;
   ex(3, 3) = 1;
 
+  ifs >> disparity_x_ >> disparity_y_;
+
   ifs.close();
 }
 
