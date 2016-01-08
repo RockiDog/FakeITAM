@@ -230,9 +230,8 @@ Vector4f fakeitam::engine::BilinearInterpolationWithHoles(const MemBlock<Vector4
                                                           const Vector2f& pos,
                                                           const Vector2i& size) {
   int x = pos.x, y = pos.y;
-  if (x >= size.x || x < 0 || y >= size.y || y < 0)
+  if (x + 1 >= size.x || x < 0 || y + 1 >= size.y || y < 0)
     return Vector4f(0, 0, 0, -1);
-
 
   const Vector4f& a = src[x + 0 + (y + 0) * size.x];
   const Vector4f& b = src[x + 1 + (y + 0) * size.x];
@@ -254,7 +253,7 @@ Vector4d fakeitam::engine::BilinearInterpolationWithHoles(const MemBlock<Vector4
                                                           const Vector2f& pos,
                                                           const Vector2i& size) {
   int x = pos.x, y = pos.y;
-  if (x >= size.x || x < 0 || y >= size.y || y < 0)
+  if (x + 1 >= size.x || x < 0 || y + 1 >= size.y || y < 0)
     return Vector4d(0, 0, 0, -1);
 
   const Vector4d& a = src[x + 0 + (y + 0) * size.x];
