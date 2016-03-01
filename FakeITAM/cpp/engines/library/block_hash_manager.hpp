@@ -29,6 +29,8 @@ enum BlockVisibility {
 };
 
 struct BlockHashEntry {
+  BlockHashEntry() : excess_offset_next(0), offset_in_array(-2) {}
+
   /*
    * The block coordinates, in block
    */

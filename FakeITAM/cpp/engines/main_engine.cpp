@@ -9,12 +9,13 @@
 #include "engines/main_engine.hpp"
 
 #include <cstdarg>
-#include <iostream>
+#include <ctime>
 #include <stdexcept>
 
 #include "global_config.hpp"
 #include "engines/depth_tracking_engine.hpp"
 #include "engines/image_engine.hpp"
+#include "engines/log_engine.hpp"
 #include "engines/reconstruction_engine.hpp"
 #include "engines/rendering_engine.hpp"
 #include "engines/tracking_engine.hpp"
@@ -28,19 +29,17 @@ using namespace fakeitam::config;
 using namespace fakeitam::engine;
 using namespace fakeitam::utility;
 
-MainEngine::MainEngine(const char* calib_filename, ...) : flags_(gInitializationFlags), cycles_(-1) {
-  if (flags_ & USE_DEBUG_MODE)
-    cout << "\nINITIALIZING Main Engine ..." << endl;
+MainEngine::MainEngine(const char* calib_filename, ...) : cycles_(-1) {
+  LOG->WriteLine(I, "INITIALIZING Main Engine ...");
 
   va_list args;
   va_start(args, calib_filename);
-  if (flags_ & USE_LIVE_DATA) {
+  if (gInitializationFlags & USE_LIVE_DATA) {
     /* TODO Live data from RGB-D Camera */
   } else {
     const char* ppm_filename_format = va_arg(args, const char*);
     const char* pgm_filename_format = va_arg(args, const char*);
-    if (flags_ & USE_DEBUG_MODE)
-      cout << "INITIALIZING Image Engine ..." << endl;
+    LOG->WriteLine(I, "INITIALIZING Image Engine ...");
     image_engine_ = new ImageFileReader(calib_filename, ppm_filename_format, pgm_filename_format);
   }
   va_end(args);
@@ -53,23 +52,22 @@ MainEngine::MainEngine(const char* calib_filename, ...) : flags_(gInitialization
                            gBlockHashOrderedArraySize - 1, gBlockHashLocalNum, gVoxelBlockSizeC);
   camera_pose_ = new CameraPose;
   point_cloud_ = new PointCloud(view_size_, gRenderMaxPointCloudAge, MEM_CPU);
-  if ((flags_ & USE_DEPTH_TRACKING) &&
-      (flags_ & USE_COLOR_TRACKING) == 0 &&
-      (flags_ & USE_FEATURES_TRACKING) == 0) {
-    if (flags_ & USE_DEBUG_MODE)
-      cout << "INITIALIZING Tracking Engine ..." << endl;
+  if ((gInitializationFlags & USE_DEPTH_TRACKING) &&
+      (gInitializationFlags & USE_COLOR_TRACKING) == 0 &&
+      (gInitializationFlags & USE_FEATURES_TRACKING) == 0) {
+    LOG->WriteLine(I, "INITIALIZING Tracking Engine ...");
     tracking_engine_ = new DepthTrackingEngine;
+  } else {
+    /* TODO Other tracking methods */
   }
-  /* TODO Other tracking methods */
 
-  if (flags_ & USE_DEBUG_MODE)
-    cout << "INITIALIZING Reconstruction Engine ..." << endl;
+  LOG->WriteLine(I, "INITIALIZING Reconstruction Engine ...");
   reconstruction_engine_ = new ReconstructionEngine;
 
-  if (flags_ & USE_DEBUG_MODE)
-    cout << "INITIALIZING Rendering Engine ..." << endl;
+  LOG->WriteLine(I, "INITIALIZING Rendering Engine ...");
   rendering_engine_ = new RenderingEngine(view_size_);
-  cout << "START PROCESSING ...\n" << endl;
+
+  LOG->WriteLine(I, "START PROCESSING ...")->WriteLine();
 }
 
 MainEngine::~MainEngine() {
@@ -96,52 +94,55 @@ MainEngine::~MainEngine() {
 
 void MainEngine::ProcessOneFrame() throw(std::runtime_error) {
   ++cycles_;
-  if (flags_ & USE_DEBUG_MODE)
-    cout << " ****** current cycle ##" << cycles_ << endl;
+  LOG->Write(I)
+     ->WriteLineF("\033[31;1;4m\t****** current cycle ##%d ******\033[0m", cycles_);
+
+  clock_t t, start = clock();
+  float ms, total_ms = 0;
 
   /* Step 1: Read input "Frames" */
-  if (flags_ & USE_DEBUG_MODE)
-    cout << "\tprocessing frame ##" << image_engine_->current_frame_n() + 1 << " ... ... ..." << flush;
+  LOG->WriteF(I, "loading RGB and depth frame ##%d ... ... ... ", image_engine_->current_frame_n() + 1);
   if (image_engine_->MoreFramesAvaliable() == false)
     throw runtime_error("Fatal Error: No more frames!");
   const ImageRGB8u* rgb_frame;
   const ImageMono16u* raw_disparity_map;
   this->image_engine_->NextRGBDFrame(&rgb_frame, &raw_disparity_map);
-  if (flags_ & USE_DEBUG_MODE)
-    cout << " end" << endl;
+  //this->image_engine_->set_current_frame_n(0); this->image_engine_->CurrentRGBDFrame(&rgb_frame, &raw_disparity_map);
+  LOG->WriteLineF("\033[31;1m\t%.2fms\033[0m", ms=((t=clock()-start)*1000.0/CLOCKS_PER_SEC));
+  total_ms += ms;
 
   /* Step 2: Construct current "View" */
-  if (flags_ & USE_DEBUG_MODE)
-    cout << "\tconstructing current view ... ... ..." << flush;
+  LOG->Write(I, "constructing the current view ... ... ... ");
   view_->SetRGBDFrame(rgb_frame, raw_disparity_map);
   this->view_manager_->UpdateView(view_);
-  if (flags_ & USE_DEBUG_MODE)
-    cout << " end" << endl;
+  LOG->WriteLineF("\033[31;1m\t%.2fms\033[0m", ms=((t=clock()-start)*1000.0/CLOCKS_PER_SEC));
+  total_ms += ms;
 
   /* Step 3: Track the camera "CameraPose" */
   if (cycles_ > 0) {  /* Do not track camera at the first cycle */
-    if (flags_ & USE_DEBUG_MODE) {
-      if ((flags_ & USE_DEPTH_TRACKING) &&
-          (flags_ & USE_COLOR_TRACKING) == 0 &&
-          (flags_ & USE_FEATURES_TRACKING) == 0)
-        cout << "\trunning depth tracking ... ... ..." << flush;
+    if ((gInitializationFlags & USE_DEPTH_TRACKING) &&
+        (gInitializationFlags & USE_COLOR_TRACKING) == 0 &&
+        (gInitializationFlags & USE_FEATURES_TRACKING) == 0) {
+      LOG->Write(I, "running depth tracking method ... ... ... ");
+    } else {
       /* TODO Other tracking methods */
     }
-    this->tracking_engine_->TrackCamera(*view_, *point_cloud_, *camera_pose_, camera_pose_);
-    if (flags_ & USE_DEBUG_MODE)
-      cout << " end" << endl;
+    //this->tracking_engine_->TrackCamera(*view_, *point_cloud_, *camera_pose_, camera_pose_);
+    this->tracking_engine_->TrackCamera(*view_, *point_cloud_, *camera_pose_, nullptr);
+    LOG->WriteLineF("\033[31;1m\t%.2fms\033[0m", ms=((t=clock()-start)*1000.0/CLOCKS_PER_SEC));
+    total_ms += ms;
   }
+  LOG->WriteLine()->Write(D, "\tTg: ")->WriteLine(camera_pose_->m)->WriteLine();
 
   /* Step 4: Reconstruct the world "Scene" */
-  if (flags_ & USE_DEBUG_MODE)
-    cout << "\treconstructing world scene ... ... ..." << flush;
+  LOG->Write(I, "reconstructing the world scene ... ... ... ");
   this->reconstruction_engine_->AllocateWorldSceneFromView(*view_, *camera_pose_, world_scene_);
   this->reconstruction_engine_->IntegrateVoxelsToWorldScene(*view_, *camera_pose_, world_scene_);
-  if (flags_ & USE_DEBUG_MODE)
-    cout << " end" << endl;
+  LOG->WriteLineF("\033[31;1m\t%.2fms\033[0m", ms=((t=clock()-start)*1000.0/CLOCKS_PER_SEC));
+  total_ms += ms;
 
   /* Step 5: Render the "PointCloud" for next time tracking */
-  if (flags_ & USE_FORWARD_PROJECTION) {
+  if (gInitializationFlags & USE_FORWARD_PROJECTION) {
     bool require_full_rendering = false;
     if (point_cloud_->age() == gRenderMaxPointCloudAge) {
       require_full_rendering = true;
@@ -152,25 +153,23 @@ void MainEngine::ProcessOneFrame() throw(std::runtime_error) {
       require_full_rendering = distance > gRenderMaxCameraDistance2 ? true : false;
     }
     if (require_full_rendering) {
-      if (flags_ & USE_DEBUG_MODE)
-        cout << "\tprocessing full raycasting ... ... ..." << flush;
+      LOG->Write(I, "processing full raycast rendering ... ... ... ");
       this->rendering_engine_->FullRenderIcpMaps(*world_scene_, *view_, *camera_pose_, point_cloud_);
       point_cloud_->ResetAge();
     } else {
-      if (flags_ & USE_DEBUG_MODE)
-        cout << "\tprocessing forward projection ... ... ..." << flush;
+      LOG->Write(I, "processing forward projection ... ... ... ");
       this->rendering_engine_->ForwardProject(*world_scene_, *view_, *camera_pose_, *point_cloud_, point_cloud_);
       point_cloud_->IncreaseAge();
     }
   } else {
-    if (flags_ & USE_DEBUG_MODE)
-      cout << "\tprocessing full raycasting ... ... ..." << flush;
+    LOG->Write(I, "processing full raycast rendering ... ... ... ");
     this->rendering_engine_->FullRenderIcpMaps(*world_scene_, *view_, *camera_pose_, point_cloud_);
     point_cloud_->ResetAge();
   }
-  if (flags_ & USE_DEBUG_MODE)
-    cout << " end" << endl;
+  LOG->WriteLineF("\033[31;1m\t%.2fms\033[0m", ms=((t=clock()-start)*1000.0/CLOCKS_PER_SEC));
+  total_ms += ms;
 
-  if (flags_ & USE_DEBUG_MODE)
-    cout << " ****** current cycle ##" << cycles_ << " accomplished\n" << endl;
+  LOG->Write(I)
+     ->WriteLineF("\033[31;1;4m\t****** current cycle ##%d accomplished (%.2fms) ******\033[0m", cycles_, total_ms)
+     ->WriteLine();
 }

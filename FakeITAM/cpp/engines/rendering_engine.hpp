@@ -1,6 +1,6 @@
 //
 //  rendering_engine.hpp
-//
+//  FakeITAM
 //
 //  Created by Soap on 15/12/11.
 //  Copyright © 2015年 Soap. All rights reserved.
@@ -11,6 +11,7 @@
 
 #include <vector>
 
+#include "engines/library/image_utils.hpp"
 #include "utilities/vector.hpp"
 
 namespace fakeitam {
@@ -50,6 +51,11 @@ class RenderingEngine {
   RenderingEngine(utility::Vector2i view_size);
   virtual ~RenderingEngine();
 
+  ImageMono8u* tsdf_map;
+
+  const utility::Vector2i* range_resolution() const { return range_resolution_; }
+  const utility::MemBlock<utility::Vector2f>* ray_length_range() const { return ray_length_range_; }
+
   virtual void FullRenderIcpMaps(const Scene& scene_in,
                                  const View& view_in,
                                  const CameraPose& pose_in,
@@ -63,7 +69,7 @@ class RenderingEngine {
  protected:
   virtual void FindBoundingBoxes(const Scene& scene_in,
                                  const View& view_in,
-                                 const utility::Matrix4f& Tg_in,
+                                 const utility::Matrix4f& Ti_g_in,
                                  const std::vector<int>& visible_blocks,
                                        utility::MemBlock<utility::Vector2f>* ray_length_range_out);
 
@@ -88,7 +94,7 @@ class RenderingEngine {
   bool GetBoundingBox(const utility::Vector3i& block_in,
                       const View& view_in,
                       const utility::Vector2i& range_resolution_in,
-                      const utility::Matrix4f& Tg_in,
+                      const utility::Matrix4f& Ti_g_in,
                             BoundingBox* bounding_box_out);
 
   bool ReadNearestTsdf(const Scene& scene_in, const utility::Vector3f& point_in, float* tsdf_out);

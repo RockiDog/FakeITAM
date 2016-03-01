@@ -10,6 +10,7 @@
 #define FAKEITAM_CPP_ENGINES_RECONSTRUCTION_ENGINE_HPP_
 
 #include "engines/library/block_hash_manager.hpp"
+#include "engines/library/image_utils.hpp"
 #include "engines/library/scene.hpp"
 #include "utilities/matrix.hpp"
 
@@ -24,6 +25,8 @@ class ReconstructionEngine {
   ReconstructionEngine();
   virtual ~ReconstructionEngine();
 
+  ImageMono8u* tsdf_map;
+
   virtual void ResetWorldScene(Scene* scene_out);
   virtual void AllocateWorldSceneFromView(const View& view_in,
                                           const CameraPose& camera_pose_in,
@@ -31,7 +34,7 @@ class ReconstructionEngine {
   virtual void IntegrateVoxelsToWorldScene(const View& view_in,
                                            const CameraPose& camera_pose_in,
                                                  Scene* scene_out);
-  static float ShortToFloat(short v) { return (float)v / 32767; }
+  static float ShortToFloat(short v) { return v * 1.0 / 32767; }
   static short FloatToShort(float v) { return (short)(v * 32767); }
 
  private:
@@ -55,12 +58,12 @@ class ReconstructionEngine {
   bool IsBlockVisible(const View& view_in,
                       const utility::Vector2i& view_size_in,
                       const utility::Vector4f& intrinsics_in,
-                      const utility::Matrix4f& Tg_in,
+                      const utility::Matrix4f& Ti_g_in,
                       const utility::Vector3i& block_in);
   bool IsVoxelVisible(const utility::Vector4f& voxel,
                       const utility::Vector2i& view_size_in,
                       const utility::Vector4f& intrinsics_in,
-                      const utility::Matrix4f& Tg_in);
+                      const utility::Matrix4f& Ti_g_in);
 
   utility::MemBlock<utility::Vector3i>* voxel_block_cache_;
 

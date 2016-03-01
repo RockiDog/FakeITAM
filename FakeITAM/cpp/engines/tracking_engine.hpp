@@ -27,7 +27,7 @@ class TrackingEngine {
   virtual void TrackCamera(const View& view_in,
                            const PointCloud& global_pcl_in_,
                            const CameraPose& pose_in,
-                                 CameraPose* pose_out) const = 0;
+                                 CameraPose* pose_out) = 0;
 
  private:
   TrackingEngine(const TrackingEngine&);

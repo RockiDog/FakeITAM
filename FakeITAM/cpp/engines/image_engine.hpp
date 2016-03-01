@@ -25,6 +25,7 @@ class ImageEngine {
   virtual ~ImageEngine();
 
   int current_frame_n() const { return current_frame_n_; }
+  void set_current_frame_n(int frame_n) { current_frame_n_ = frame_n; }
   const RGBDCalibrator* calibrator() const { return calibrator_; }
 
   virtual bool MoreFramesAvaliable() = 0;

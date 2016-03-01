@@ -27,6 +27,8 @@ class Cholesky {
     matrix_ = nullptr;
   }
 
+  const Matrix<T, SIZE, SIZE>* matrix() const { return matrix_; }
+
   /* Calculate the Ax = b result */
   void SolveLinearEquations(const Matrix<T, SIZE, 1>& b_in, Matrix<T, SIZE, 1>* x_out);
 
@@ -66,15 +68,15 @@ inline void Cholesky<T, SIZE>::SolveLinearEquations(
     Matrix<T, SIZE, 1>* x_out) {
   Matrix<T, SIZE, 1>& result = *x_out;
   for (int i = 0; i < SIZE; ++i) {
-    result(i, 1) = b_in(i, 1);
+    result(i, 0) = b_in(i, 0);
     for (int j = 0; j < i; ++j) {
-      result(i, 1) = result(i, 1) - result(j, 1) * (*matrix_)(i, j);
-      result(i, 1) = result(i, 1) / (*matrix_)(i, i);
+      result(i, 0) = result(i, 0) - result(j, 0) * (*matrix_)(i, j);
+      result(i, 0) = result(i, 0) / (*matrix_)(i, i);
     }
   }
   for (int i = SIZE - 1; i >= 0; --i) {
     for (int j = SIZE - 1; j > i; --j)
-      result(i, 1) = result(i, 1) - result(j, 1) * (*matrix_)(i, j);
+      result(i, 0) = result(i, 0) - result(j, 0) * (*matrix_)(i, j);
   }
 }
 

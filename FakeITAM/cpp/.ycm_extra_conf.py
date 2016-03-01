@@ -35,6 +35,7 @@ import ycm_core
 # CHANGE THIS LIST OF FLAGS. YES, THIS IS THE DROID YOU HAVE BEEN LOOKING FOR.
 flags = [
 '-Wall',
+'-Wno-deprecated-declarations',
 '-std=c++11',
 '-stdlib=libc++',
 '-x',

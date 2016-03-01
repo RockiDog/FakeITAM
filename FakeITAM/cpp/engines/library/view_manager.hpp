@@ -11,6 +11,7 @@
 
 #include <cmath>
 
+#include "global_config.hpp"
 #include "engines/library/calibrator.hpp"
 #include "engines/library/image_utils.hpp"
 #include "utilities/mem_block.hpp"
@@ -135,7 +136,9 @@ inline void ViewManager::CalculateNormal(const ImageMono32f& depth_in,
   normal.x = up_down.y * left_right.z - up_down.z * left_right.y;
   normal.y = up_down.z * left_right.x - up_down.x * left_right.z;
   normal.z = up_down.x * left_right.y - up_down.y * left_right.x;
-  if (normal.x <= 0 && normal.y <= 0 && normal.z <=0) {
+  if (fabs(normal.x) <= config::gMathFloatEpsilon &&
+      fabs(normal.y) <= config::gMathFloatEpsilon &&
+      fabs(normal.z) <= config::gMathFloatEpsilon) {
     normal.w = -1;
     return;
   }

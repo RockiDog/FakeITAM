@@ -43,7 +43,6 @@ class MainEngine {
   const CameraPose* camera_pose() const { return camera_pose_; }
   const PointCloud* point_cloud() const { return point_cloud_; }
 
-  unsigned char flags() const { return flags_; }
   utility::Vector2i view_size() const { return view_size_; }
   int cycles() const { return cycles_; }
 
@@ -61,7 +60,6 @@ class MainEngine {
   CameraPose* camera_pose_;
   PointCloud* point_cloud_;
 
-  const unsigned char flags_;
   utility::Vector2i view_size_;
   int cycles_;
 

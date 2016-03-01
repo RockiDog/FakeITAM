@@ -25,7 +25,7 @@ const unsigned char USE_GPU_ACCELERATION   = 0x01 << 6;  /* b0100_0000 */
 const unsigned char USE_DEBUG_MODE         = 0x01 << 7;  /* b1000_0000 */
 
 const unsigned char gInitializationFlags = USE_DEPTH_TRACKING |
-                                           USE_FORWARD_PROJECTION |
+                                           //USE_FORWARD_PROJECTION |
                                            USE_DEBUG_MODE;
 
 const float gMathFloatEpsilon = std::numeric_limits<float>::epsilon();
@@ -50,15 +50,15 @@ const int gBlockHashOrderedArraySize = 0x100000;
 const int gBlockHashExcessListSize   =  0x20000;
 const int gBlockHashLocalNum         =  0x40000;
 
-const float gVoxelMetricSize = 0.005;  /* in meter */
+const float gVoxelMetricSize = 0.001;  /* in meter */
 const int gVoxelBlockSizeL =   8;      /* linear */
 const int gVoxelBlockSizeQ =  64;      /* quadric */
 const int gVoxelBlockSizeC = 512;      /* cubic */
 
 const float gRaycastRangeZMin = 0.05;
 const float gRaycastRangeZMax = 999999.9;
-const float gRaycastSmallTsdfMin = -0.5;
-const float gRaycastSmallTsdfMax = 0.1;
+const float gRaycastSmallTsdfMin = -0.9;
+const float gRaycastSmallTsdfMax = 0.9;
 const int gBoundBoxFragmentSizeL = 16;  /* linear */
 const int gBoundBoxMaxFragmentNum = 65536 << 2;
 const int gBoundBoxSubsample = 8;

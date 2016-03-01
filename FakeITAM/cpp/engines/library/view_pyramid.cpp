@@ -56,6 +56,7 @@ void ViewPyramid::subsample_with_holes(const ImageMono32f* depth_in,
                                              ImageMono32f** depth_out,
                                              utility::Vector2i origin_size) {
   Vector2i new_size = origin_size / 2;
+  (*depth_out) = new ImageMono32f(new_size.x * new_size.y, MEM_CPU);
   for (int i = 0; i < new_size.y; ++i) {
     for (int j = 0; j < new_size.x; ++j) {
       float depth_src, depth = 0;
@@ -86,8 +87,10 @@ void ViewPyramid::subsample_with_holes(const ImageMono32f* depth_in,
         ++valid_pixel_num;
       }
       
-      (*depth_out) = new ImageMono32f(new_size.x * new_size.y, MEM_CPU);
-      (**depth_out)[i * new_size.x + j] = depth / valid_pixel_num;
+      if (valid_pixel_num > 0)
+        (**depth_out)[i * new_size.x + j] = depth / valid_pixel_num;
+      else
+        (**depth_out)[i * new_size.x + j] = 0;
     }
   }
 }

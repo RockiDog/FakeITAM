@@ -19,15 +19,18 @@ namespace engine {
 
 struct CameraPose;
 class PointCloud;
+class ViewPyramid;
 
 class DepthTrackingEngine : public TrackingEngine {
  public:
-  DepthTrackingEngine() = default;
-  virtual ~DepthTrackingEngine() = default;
+  DepthTrackingEngine() : view_pyramid_(nullptr) {}
+  virtual ~DepthTrackingEngine();
   virtual void TrackCamera(const View& view_in,
                            const PointCloud& global_pcl_in,
                            const CameraPose& pose_in,
-                                 CameraPose* pose_out) const;
+                                 CameraPose* pose_out);
+
+  const ViewPyramid* view_pyramid() const { return view_pyramid_; }
 
  private:
   void SigmaAtAAndSigmaAtB(const View& view_in,
@@ -58,6 +61,8 @@ class DepthTrackingEngine : public TrackingEngine {
                        const utility::Matrix<float, 4, 4>& Tg_last_estimate_in,
                              utility::Matrix<float, 4, 4>* Tg_estimate_out) const;
   bool IsConverged(const utility::Matrix<float, 6, 1>& x_in) const;
+
+  ViewPyramid* view_pyramid_;
 
   DepthTrackingEngine(const DepthTrackingEngine&);
   DepthTrackingEngine& operator=(const DepthTrackingEngine&);

@@ -14,6 +14,7 @@
 #include <initializer_list>
 #include <iomanip>
 #include <iostream>
+#include <stdexcept>
 #include <typeinfo>
 
 #include "utilities/vector.hpp"
@@ -112,14 +113,26 @@ class Matrix {
     return result;
   }
 
-  T& operator()(int row, int col) { return v[col][row]; }
-  const T& operator()(int row, int col) const { return v[col][row]; }
+  T& operator()(int row, int col) throw(std::runtime_error) {
+    if (row >= ROW_N || col >= COL_N)
+      throw std::runtime_error("Matrix index out of bounds!");
+    return v[col][row];
+  }
+
+  const T& operator()(int row, int col) const throw(std::runtime_error) {
+    if (row >= ROW_N || col >= COL_N)
+      throw std::runtime_error("Matrix index out of bounds!");
+    return v[col][row];
+  }
 
   static Matrix<T, ROW_N, COL_N> Identity() {
-    Matrix<T, ROW_N, COL_N> I;
-    int size = ROW_N < COL_N ? ROW_N : COL_N;
-    for (int i = 0; i < size; ++i)
-      I.v[i][i] = 1;
+    static const Matrix<T, ROW_N, COL_N> I = []()->Matrix<T, ROW_N, COL_N> {
+      Matrix<T, ROW_N, COL_N> identity;
+      int size = ROW_N < COL_N ? ROW_N : COL_N;
+      for (int i = 0; i < size; ++i)
+        identity.v[i][i] = 1;
+      return identity;
+    }();
     return I;
   }
 
@@ -184,7 +197,7 @@ Vector6<T> operator*(const Matrix<T, 6, 6>& operand1, const Vector6<T>& operand2
 }
 
 template<typename T>
-Matrix<T, 2, 2> GetInverse(const Matrix<T, 2, 2>& m) {
+Matrix<T, 2, 2> GetInverse(const Matrix<T, 2, 2>& m) throw(std::runtime_error) {
   Matrix<T, 2, 2> m_out;
   if (m(0, 0) * m(1, 1) != m(0, 1) * m(1, 0)) {
     m_out(0, 0) = m(1, 1);
@@ -192,18 +205,25 @@ Matrix<T, 2, 2> GetInverse(const Matrix<T, 2, 2>& m) {
     m_out(0, 1) = -m(0, 1);
     m_out(1, 0) = -m(1, 0);
     m_out = m_out / (m(0, 0) * m(1, 1) - m(0, 1) * m(1, 0));
+  } else {
+    throw std::runtime_error("Singular matrix!");
   }
   return m_out;
 }
 
 template<typename T>
-Matrix<T, 4, 4> GetInverse(const Matrix<T, 4, 4>& m) {
+Matrix<T, 4, 4> GetInverse(const Matrix<T, 4, 4>& m) throw(std::runtime_error) {
   Matrix<T, 2, 2> A {m(0, 0), m(0, 1), m(1, 0), m(1, 1)};
   Matrix<T, 2, 2> B {m(0, 2), m(0, 3), m(1, 2), m(1, 3)};
   Matrix<T, 2, 2> C {m(2, 0), m(2, 1), m(3, 0), m(3, 1)};
   Matrix<T, 2, 2> D {m(2, 2), m(2, 3), m(3, 2), m(3, 3)};
-  Matrix<T, 2, 2> A_inv = GetInverse(A);
-  Matrix<T, 2, 2> DCAB = GetInverse(D - C * A_inv * B);
+  Matrix<T, 2, 2> A_inv, DCAB;
+  try {
+    A_inv = GetInverse(A);
+    DCAB = GetInverse(D - C * A_inv * B);
+  } catch (std::runtime_error e) {
+    throw e;
+  }
   Matrix<T, 2, 2> AB = A_inv * B;
   Matrix<T, 2, 2> CA = C * A_inv;
 

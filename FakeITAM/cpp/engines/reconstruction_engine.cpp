@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "global_config.hpp"
+#include "engines/log_engine.hpp"
 #include "engines/tracking_engine.hpp"
 #include "engines/library/block_hash_manager.hpp"
 #include "engines/library/camera_pose.hpp"
@@ -24,24 +25,30 @@ using namespace fakeitam::utility;
 
 ReconstructionEngine::ReconstructionEngine() {
   voxel_block_cache_ = new MemBlock<Vector3i>(gBlockHashMapSize, MEM_CPU);
+  tsdf_map = new ImageMono8u(640 * 480, MEM_CPU);
 }
 
 ReconstructionEngine::~ReconstructionEngine() {
   delete voxel_block_cache_;
   voxel_block_cache_ = nullptr;
+
+  delete tsdf_map;
+  tsdf_map = nullptr;
 }
 
 /* TODO Tired, implement later */
-void ReconstructionEngine::ResetWorldScene(Scene* scene_out) {
-}
+void ReconstructionEngine::ResetWorldScene(Scene* scene_out) { }
 
 /* TODO Test */
 void ReconstructionEngine::AllocateWorldSceneFromView(const View& view_in,
                                                       const CameraPose& camera_pose_in,
                                                             Scene* scene_out) {
+  tsdf_map->ResetData();
+
   const Vector2i& view_size = view_in.size;
   const Vector4f& intrinsics = view_in.intrinsics;
   const Matrix4f& Tg = camera_pose_in.m;
+  const Matrix4f Ti_g = GetInverse(Tg);
 
   /* For every pixel check its visibility */
   VoxelBlockHashMap& hash_map = *scene_out->index_;
@@ -74,6 +81,8 @@ void ReconstructionEngine::AllocateWorldSceneFromView(const View& view_in,
           
           (*block_hash_list)[i] = entry;
           scene_out->last_local_array_id_ = last_voxel_array_id;
+          (*visibility_table)[i] = VISIBLE_LOCALLY;
+          (*allocation_types)[i] = NO_REQUIREMENT;
         }
       } break;
       case REQUIRE_ALLOCATION_EXCESS: {
@@ -89,10 +98,11 @@ void ReconstructionEngine::AllocateWorldSceneFromView(const View& view_in,
           (*block_hash_list)[i].excess_offset_next = offset + 1;
           offset += gBlockHashOrderedArraySize;
           (*block_hash_list)[offset] = entry;
-          (*visibility_table)[offset] = VISIBLE_LOCALLY;
           
           scene_out->last_local_array_id_ = last_voxel_array_id;
           hash_map.set_last_excess_list_id(last_excess_list_id);
+          (*visibility_table)[offset] = VISIBLE_LOCALLY;
+          (*allocation_types)[i] = NO_REQUIREMENT;
         }
       } break;
       default: break;
@@ -103,11 +113,12 @@ void ReconstructionEngine::AllocateWorldSceneFromView(const View& view_in,
   for (int i = 0; i < gBlockHashMapSize; ++i) {
     if ((*visibility_table)[i] == VISIBLE_IN_LAST_FRAME) {
       const Vector3i& block = (*voxel_block_cache_)[i];
-      if (IsBlockVisible(view_in, view_in.size, intrinsics, Tg, block) == false)
+      if (IsBlockVisible(view_in, view_in.size, intrinsics, Ti_g, block) == false)
         (*visibility_table)[i] = INVISIBLE;
     }
-    if ((*visibility_table)[i] != INVISIBLE)
+    if ((*visibility_table)[i] != INVISIBLE) {
       scene_out->visible_list_.push_back(i);
+    }
   }
 }
 
@@ -123,67 +134,66 @@ void ReconstructionEngine::UpdateHashEntriesAndBlockCache(const View& view_in,
                                                                 MemBlock<BlockAllocation>* allocation_type_out) {
   int pixel_id = y * view_in.size.x + x;
   float depth = (*view_in.depth_map)[pixel_id];
+  if ((depth >= 0) == false)
+    return;
   const float block_metric_size = gVoxelMetricSize * gVoxelBlockSizeL;
-  Vector4f point_4d_l {depth * (x - intrinsics_in.w) / intrinsics_in.x,
-                       depth * (y - intrinsics_in.z) / intrinsics_in.y,
+  Vector4f point_4d_l {depth * (x - intrinsics_in.z) / intrinsics_in.x,
+                       depth * (y - intrinsics_in.w) / intrinsics_in.y,
                        depth, 0};
   Vector4f direction_l = point_4d_l / point_4d_l.GetNorm();
   Vector4f front_4d_l = point_4d_l - direction_l * gTsdfBandWidthMu;
   Vector4f back_4d_l = point_4d_l + direction_l * gTsdfBandWidthMu;
   Vector3f front_3d_g = (Tg_in * front_4d_l / block_metric_size).ProjectTo3d();
   Vector3f back_3d_g = (Tg_in * back_4d_l / block_metric_size).ProjectTo3d();
-  int step_n = ceil((front_3d_g - back_3d_g).GetNorm() * 2);
-  Vector3f step_3d_g = (front_3d_g - back_3d_g) / (step_n - 1);
+  int step_n = ceil((back_3d_g - front_3d_g).GetNorm() * 2);
+  Vector3f step_3d_g = (back_3d_g - front_3d_g) / (step_n - 1);
 
   for (int i = 0; i < step_n; ++i) {
-    Vector3i point {(int)front_3d_g.x, (int)front_3d_g.y, (int)front_3d_g.z};
-    int hash = hash_map_in.BlockHash(point);
+    Vector3i block {(int)front_3d_g.x, (int)front_3d_g.y, (int)front_3d_g.z};
+    int hash = hash_map_in.BlockHash(block);
     BlockHashEntry entry = (*block_hash_list_out)[hash];
     bool is_block_found = false;
-    if (entry.position.x == point.x &&
-        entry.position.y == point.y &&
-        entry.position.z == point.z &&
+    if (entry.position.x == block.x &&
+        entry.position.y == block.y &&
+        entry.position.z == block.z &&
         entry.offset_in_array >= -1) {
       is_block_found = true;
       (*allocation_type_out)[hash] = NO_REQUIREMENT;
       if (entry.offset_in_array >= 0)
         (*visibility_table_out)[hash] = VISIBLE_LOCALLY;
-      else
+      else  /* offset_in_array == -1 */
         (*visibility_table_out)[hash] = VISIBLE_SWAPPED_OUT;
     }
     
     bool is_in_excess_list = false;
-    if (is_block_found == false) {
+    if (is_block_found == false && entry.offset_in_array >= -1) {
       /* Probably in excess list */
-      if (entry.offset_in_array >= -1) {
-        while (entry.excess_offset_next > 0) {
-          hash = gBlockHashOrderedArraySize + entry.excess_offset_next - 1;
-          entry = (*block_hash_list_out)[hash];
-          if (entry.position.x == point.x &&
-              entry.position.y == point.y &&
-              entry.position.z == point.z &&
-              entry.offset_in_array >= -1) {
-            is_block_found = true;
-            (*allocation_type_out)[hash] = NO_REQUIREMENT;
-            if (entry.offset_in_array >= 0)
-              (*visibility_table_out)[hash] = VISIBLE_LOCALLY;
-            else
-              (*visibility_table_out)[hash] = VISIBLE_SWAPPED_OUT;
-            break;
-          }
+      while (entry.excess_offset_next > 0) {
+        hash = gBlockHashOrderedArraySize + entry.excess_offset_next - 1;
+        entry = (*block_hash_list_out)[hash];
+        if (entry.position.x == block.x &&
+            entry.position.y == block.y &&
+            entry.position.z == block.z &&
+            entry.offset_in_array >= -1) {
+          is_block_found = true;
+          (*allocation_type_out)[hash] = NO_REQUIREMENT;
+          if (entry.offset_in_array >= 0)
+            (*visibility_table_out)[hash] = VISIBLE_LOCALLY;
+          else  /* offset_in_array == -1 */
+            (*visibility_table_out)[hash] = VISIBLE_SWAPPED_OUT;
+          break;
         }
-        is_in_excess_list = true;
       }
+      is_in_excess_list = true;
     }
     
     /* Still not found, require allocation */
     if (is_block_found == false) {
-      (*visibility_table_out)[hash] = VISIBLE_LOCALLY;
       if (is_in_excess_list)  /* The ordered list is full */
         (*allocation_type_out)[hash] = REQUIRE_ALLOCATION_EXCESS;
       else                    /* Allocate in the ordered list */
         (*allocation_type_out)[hash] = REQUIRE_ALLOCATION_ARRAY;
-      (*block_cache_out)[hash] = point;
+      (*block_cache_out)[hash] = block;
     }
     front_3d_g = front_3d_g + step_3d_g;
   }
@@ -204,8 +214,8 @@ void ReconstructionEngine::IntegrateVoxelsToWorldScene(const View& view_in,
   Vector3f camera_coordinates = camera_pose_in.t();
 
   const MemBlock<BlockHashEntry>& hash_list = *(scene_out->index_->hash_list());
-  const MemBlock<Voxel>& local_voxel_array = *(scene_out->local_voxel_array_);
   const std::vector<int>& visible_list = scene_out->visible_list_;
+  MemBlock<Voxel>& local_voxel_array = *(scene_out->local_voxel_array_);
   for (auto it = visible_list.begin(); it != visible_list.end(); ++it) {
     int visible_id = *it;
     BlockHashEntry entry = hash_list[visible_id];
@@ -214,7 +224,7 @@ void ReconstructionEngine::IntegrateVoxelsToWorldScene(const View& view_in,
       for (int y = 0; y < gVoxelBlockSizeL; ++y) {
         for (int z = 0; z < gVoxelBlockSizeL; ++z) {
           int id = x + y * gVoxelBlockSizeL + z * gVoxelBlockSizeQ;
-          Voxel voxel = local_voxel_array[id];
+          Voxel& voxel = local_voxel_array[id];
           Vector3i voxel_g;
           voxel_g.x = corner.x * gVoxelBlockSizeL + x;
           voxel_g.y = corner.y * gVoxelBlockSizeL + y;
@@ -235,7 +245,7 @@ void ReconstructionEngine::IntegrateVoxelsToWorldScene(const View& view_in,
 bool ReconstructionEngine::IsBlockVisible(const View& view_in,
                                           const Vector2i& view_size_in,
                                           const Vector4f& intrinsics_in,
-                                          const Matrix4f& Tg_in,
+                                          const Matrix4f& Ti_g_in,
                                           const Vector3i& block_in) {
   const float size_factor = gVoxelBlockSizeL * gVoxelMetricSize;
   Vector4f voxel;
@@ -245,7 +255,7 @@ bool ReconstructionEngine::IsBlockVisible(const View& view_in,
         voxel.x = (block_in.x + x) * size_factor;
         voxel.y = (block_in.y + y) * size_factor;
         voxel.z = (block_in.z + z) * size_factor;
-        if (IsVoxelVisible(voxel, view_size_in, intrinsics_in, Tg_in))
+        if (IsVoxelVisible(voxel, view_size_in, intrinsics_in, Ti_g_in))
           return true;
       }
   return false;
@@ -255,13 +265,13 @@ bool ReconstructionEngine::IsBlockVisible(const View& view_in,
 bool ReconstructionEngine::IsVoxelVisible(const Vector4f& voxel_in,
                                           const Vector2i& view_size_in,
                                           const Vector4f& intrinsics_in,
-                                          const Matrix4f& Tg_in) {
+                                          const Matrix4f& Ti_g_in) {
   const float fx = intrinsics_in.x;
   const float fy = intrinsics_in.y;
   const float cx = intrinsics_in.z;
   const float cy = intrinsics_in.w;
-  Vector3f point_3d_l = (Tg_in * voxel_in).ProjectTo3d();
-  if (point_3d_l.z < gMathFloatEpsilon)
+  Vector3f point_3d_l = (Ti_g_in * voxel_in).ProjectTo3d();
+  if (point_3d_l.z <= 0)
     return false;
   Vector2f point_2d_l(point_3d_l.x / point_3d_l.z * fx + cx,
                       point_3d_l.y / point_3d_l.z * fy + cy);
@@ -296,7 +306,7 @@ void ReconstructionEngine::UpdateVoxelTsdfAndWeight(const Vector2i& view_size_in
   float dx = intrinsics_in(0, 2), dy = intrinsics_in(1, 2);
   float lambda = Vector3f((pixel.x - dx)/fx, (pixel.y - dy)/fy, 1).GetNorm();
   float eta = (camera_coordinates_in - point_g_in.ProjectTo3d()).GetNorm() / lambda - depth;
-  if (eta < -mu)
+  if (eta <= -mu)
     return;
 
   float old_F = ShortToFloat(voxel_out->sdf);
@@ -306,6 +316,9 @@ void ReconstructionEngine::UpdateVoxelTsdfAndWeight(const Vector2i& view_size_in
   int old_W = voxel_out->weight;
   int new_W = 1;
 
-  voxel_out->sdf = FloatToShort((old_F*old_W+new_F*new_W)/(old_W+new_W));
+  float new_tsdf = (old_F * old_W + new_F * new_W) / (old_W + new_W);
+  new_tsdf = 0;
+  voxel_out->sdf = FloatToShort(new_tsdf);
   voxel_out->weight = (old_W + new_W) > max_W ? max_W : (old_W + new_W);
+  (*tsdf_map)[pixel.x + pixel.y * view_size_in.x] = 255 - fabs(new_tsdf) * 255;
 }

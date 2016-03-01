@@ -21,6 +21,7 @@ namespace engine {
 class PointCloud;
 
 struct Voxel {
+  Voxel() : sdf(32767), weight(0) {}
   short sdf;
   int weight;
 };

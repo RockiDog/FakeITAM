@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "global_config.hpp"
+#include "engines/log_engine.hpp"
 #include "engines/reconstruction_engine.hpp"
 #include "engines/tracking_engine.hpp"
 #include "engines/library/block_hash_manager.hpp"
@@ -31,6 +32,7 @@ RenderingEngine::RenderingEngine(Vector2i view_size) {
   range_resolution_ = new Vector2i(ceil(view_size.x * 1.0 / gBoundBoxSubsample),
                                    ceil(view_size.y * 1.0 / gBoundBoxSubsample));
   ray_length_range_ = new MemBlock<Vector2f>(range_resolution_->x * range_resolution_->y, MEM_CPU);
+  tsdf_map = new ImageMono8u(640 * 480, MEM_CPU);
 }
 
 RenderingEngine::~RenderingEngine() {
@@ -38,6 +40,9 @@ RenderingEngine::~RenderingEngine() {
   delete ray_length_range_;
   range_resolution_ = nullptr;
   ray_length_range_ = nullptr;
+
+  delete tsdf_map;
+  tsdf_map = nullptr;
 }
 
 /* TODO Test */
@@ -45,17 +50,22 @@ void RenderingEngine::FullRenderIcpMaps(const Scene& scene_in,
                                         const View& view_in,
                                         const CameraPose& pose_in,
                                               PointCloud* pcl_out) {
+  tsdf_map->ResetData();
+
   const vector<int>& visible_blocks = scene_in.visible_list();
   const Matrix4f& Tg = pose_in.m;
+  const Matrix4f Ti_g = GetInverse(Tg);
   MemBlock<Vector4f> intersections(view_in.size.x * view_in.size.y, MEM_CPU);
   MemBlock<Vector4f> normals(view_in.size.x * view_in.size.y, MEM_CPU);
 
-  FindBoundingBoxes(scene_in, view_in, Tg, visible_blocks, ray_length_range_);
+  FindBoundingBoxes(scene_in, view_in, Ti_g, visible_blocks, ray_length_range_);
   FullRaycast(scene_in, view_in, Tg, *range_resolution_, *ray_length_range_, &intersections);
   ComputeNormals(intersections, view_in.size, &normals);  /* TODO Compute angles */
-  pcl_out->locations()->CopyBytesFrom(intersections.GetData(), intersections.byte_capacity());
-  pcl_out->normals()->CopyBytesFrom(normals.GetData(), normals.byte_capacity());
-  pcl_out->set_camera_pose(pose_in);
+  if (pcl_out != nullptr) {
+    pcl_out->locations()->CopyBytesFrom(intersections.GetData(), intersections.byte_capacity());
+    pcl_out->normals()->CopyBytesFrom(normals.GetData(), normals.byte_capacity());
+    pcl_out->set_camera_pose(pose_in);
+  }
 }
 
 /* TODO Test */
@@ -67,8 +77,8 @@ void RenderingEngine::ForwardProject(const Scene& scene_in,
   const vector<int>& visible_blocks = scene_in.visible_list();
   const Vector2i& view_size = view_in.size;
   const Matrix4f& Tg = pose_in.m;
-  const MemBlock<Vector4f>& points = *pcl_in.locations();
   const MemBlock<float>& depth_map = *view_in.depth_map;
+  const Matrix4f Ti_g = GetInverse(Tg);
   PointCloud pcl(view_size, gRenderMaxPointCloudAge, MEM_CPU);
 
   const float fx = view_in.intrinsics.x;
@@ -76,16 +86,20 @@ void RenderingEngine::ForwardProject(const Scene& scene_in,
   const float cx = view_in.intrinsics.z;
   const float cy = view_in.intrinsics.w;
 
-  FindBoundingBoxes(scene_in, view_in, Tg, visible_blocks, ray_length_range_);
+  FindBoundingBoxes(scene_in, view_in, Ti_g, visible_blocks, ray_length_range_);
   for (int y = 0; y < view_size.y; ++y) {
     for (int x = 0; x < view_size.x; ++x) {
       int id = x + y * view_size.x;
-      Vector4f point_4d_g = points[id];
-      Vector4f point_4d_l = Tg * point_4d_g;
+      Vector4f point_4d_g = (*pcl_in.locations())[id];
+      if (point_4d_g.w < 0)
+        continue;
+      Vector4f point_4d_l = Ti_g * point_4d_g;
       Vector2f point_2d(point_4d_l.x / point_4d_l.z * fx + cx, point_4d_l.y / point_4d_l.z * fy + cy);
       Vector2i pixel(round(point_2d.x), round(point_2d.y));
-      if (pixel.x < 0 || pixel.x >= view_size.x || pixel.y < 0 || pixel.y >= view_size.y)
+      if (pixel.x < 0 || pixel.x >= view_size.x || pixel.y < 0 || pixel.y >= view_size.y) {
         point_4d_g.w = -1;
+        continue;
+      }
       int new_id = pixel.x + pixel.y * view_size.x;
       (*pcl.locations())[new_id] = point_4d_g;
     }
@@ -96,7 +110,10 @@ void RenderingEngine::ForwardProject(const Scene& scene_in,
     for (int x = 0; x < view_size.x; ++x) {
       int id = x + y * view_size.x;
       const Vector4f& point = (*pcl.locations())[id];
-      const Vector2f& range = (*ray_length_range_)[id];
+      int range_x = x / gBoundBoxSubsample;
+      int range_y = y / gBoundBoxSubsample;
+      int range_id = range_x + range_y * range_resolution_->x;
+      const Vector2f& range = (*ray_length_range_)[range_id];
       /* XXX Different with InfiniTAM */
       if (point.w <= 0 && range.x < range.y && depth_map[id] >= 0)
         missed_points_id.push_back(id);
@@ -113,6 +130,10 @@ void RenderingEngine::ForwardProject(const Scene& scene_in,
     int range_y = y / gBoundBoxSubsample;
     int range_id = range_x + range_y * range_resolution_->x;
     const Vector2f& range = (*ray_length_range_)[range_id];
+    if (range.x > range.y) {
+      (*pcl.locations())[id] = Vector4f(0, 0, 0, -1);
+      continue;
+    }
     start_g.x = range.x * (x - cx) / fx;
     start_g.y = range.x * (y - cy) / fy;
     start_g.z = range.x;
@@ -128,14 +149,16 @@ void RenderingEngine::ForwardProject(const Scene& scene_in,
   }
 
   ComputeNormals(*pcl.locations(), view_size, pcl.normals());
-  pcl_out->locations()->CopyBytesFrom(pcl.locations()->GetData(), pcl.locations()->byte_capacity());
-  pcl_out->normals()->CopyBytesFrom(pcl.normals()->GetData(), pcl.normals()->byte_capacity());
+  if (pcl_out != nullptr) {
+    pcl_out->locations()->CopyBytesFrom(pcl.locations()->GetData(), pcl.locations()->byte_capacity());
+    pcl_out->normals()->CopyBytesFrom(pcl.normals()->GetData(), pcl.normals()->byte_capacity());
+  }
 }
 
 /* TODO Test */
 void RenderingEngine::FindBoundingBoxes(const Scene& scene_in,
                                         const View& view_in,
-                                        const Matrix4f& Tg_in,
+                                        const Matrix4f& Ti_g_in,
                                         const vector<int>& visible_blocks,
                                               MemBlock<Vector2f>* ray_length_range_out) {
   const VoxelBlockHashMap& index = *(scene_in.index());
@@ -155,7 +178,7 @@ void RenderingEngine::FindBoundingBoxes(const Scene& scene_in,
     
     /* Project one block */
     BoundingBox box;
-    if (GetBoundingBox(entry.position, view_in, *range_resolution_, Tg_in, &box) == false)
+    if (GetBoundingBox(entry.position, view_in, *range_resolution_, Ti_g_in, &box) == false)
       continue;
     
     /* Fragmentation */
@@ -214,6 +237,10 @@ void RenderingEngine::FullRaycast(
       int range_y = y / gBoundBoxSubsample;
       int range_id = range_x + range_y * range_resolution_in.x;
       const Vector2f& range = ray_length_range_in[range_id];
+      if (range.x > range.y) {
+        (*points_out)[x + y * view_in.size.x] = Vector4f(0, 0, 0, -1);
+        continue;
+      }
       start_g.x = range.x * (x - cx) / fx;
       start_g.y = range.x * (y - cy) / fy;
       start_g.z = range.x;
@@ -254,7 +281,9 @@ void RenderingEngine::ComputeNormals(const MemBlock<Vector4f>& points_in,
         (*normals_out)[id].x = up_down.y * left_right.z - up_down.z * left_right.y;
         (*normals_out)[id].y = up_down.z * left_right.x - up_down.x * left_right.z;
         (*normals_out)[id].z = up_down.x * left_right.y - up_down.y * left_right.x;
-        if ((*normals_out)[id].x <= 0 && (*normals_out)[id].y <= 0 && (*normals_out)[id].z <=0) {
+        if (fabs((*normals_out)[id].x) <= gMathFloatEpsilon &&
+            fabs((*normals_out)[id].y) <= gMathFloatEpsilon &&
+            fabs((*normals_out)[id].z) <= gMathFloatEpsilon) {
           (*normals_out)[id].w = -1;
         } else {
           (*normals_out)[id].w = 0;
@@ -272,9 +301,9 @@ void RenderingEngine::CastRay(const Scene& scene_in,
                                     int x, int y,
                                     Vector4f* point_out) {
   float total_length = (end_g_in - start_g_in).GetNorm();
-  int length = 0;
+  float length = 0;
   Vector3f point {start_g_in.x, start_g_in.y, start_g_in.z};
-  Vector3f one_step = (start_g_in - end_g_in).ProjectTo3d();
+  Vector3f one_step = (end_g_in - start_g_in).ProjectTo3d();
   one_step = one_step / one_step.GetNorm();
   float tsdf = 1;
   while (length < total_length) {
@@ -286,7 +315,7 @@ void RenderingEngine::CastRay(const Scene& scene_in,
       if (tsdf <= gRaycastSmallTsdfMax && tsdf >= gRaycastSmallTsdfMin) {
         /* Small T-SDF, read interpolated T-SDF */
         ReadInterpolatedTsdf(scene_in, point, &tsdf);
-        if (tsdf < gMathFloatEpsilon)
+        if (tsdf <= 0)
           /* Found zero level of T-SDF */
           break;
         else
@@ -297,10 +326,13 @@ void RenderingEngine::CastRay(const Scene& scene_in,
         step_length = tsdf * gTsdfBandWidthMu;
       }
     }
+    if (step_length < gVoxelMetricSize)
+      step_length = gVoxelMetricSize;
     length += step_length;
     point = point + one_step * step_length;
   }
-  if (tsdf < gMathFloatEpsilon) {
+  //(*tsdf_map)[x + y * 640] = fabs(tsdf) * 255;
+  if (tsdf <= 0) {
     /* Found */
     point_out->x = point.x;
     point_out->y = point.y;
@@ -315,14 +347,13 @@ void RenderingEngine::CastRay(const Scene& scene_in,
 bool RenderingEngine::GetBoundingBox(const Vector3i& block_in,
                                      const View& view_in,
                                      const Vector2i& range_resolution_in,
-                                     const Matrix4f& Tg_in,
+                                     const Matrix4f& Ti_g_in,
                                            BoundingBox* bounding_box_out) {
   const float fx = view_in.intrinsics.x;
   const float fy = view_in.intrinsics.y;
   const float cx = view_in.intrinsics.z;
   const float cy = view_in.intrinsics.w;
   const float size_factor = gVoxelBlockSizeL * gVoxelMetricSize;
-  const Matrix4f Ti_g = GetInverse(Tg_in);
 
   /* Project 8 corners */
   float left_most = view_in.size.x;
@@ -338,7 +369,7 @@ bool RenderingEngine::GetBoundingBox(const Vector3i& block_in,
         if (corner.z < gMathFloatEpsilon)
           continue;
         corner.w = 1;
-        corner = Ti_g * corner;
+        corner = Ti_g_in * corner;
         float u = (corner.x / corner.z * fx + cx) / gBoundBoxSubsample;
         float v = (corner.y / corner.z * fy + cy) / gBoundBoxSubsample;
         if (u < left_most) left_most = u;
@@ -397,10 +428,14 @@ bool RenderingEngine::ReadNearestTsdf(const Scene& scene_in,
     }
   }
   const Voxel* voxel_block = &voxel_array[entry.offset_in_array];
-  float offset_x = point_in.x/gVoxelMetricSize - entry.position.x* gVoxelBlockSizeL;
-  float offset_y = point_in.y/gVoxelMetricSize - entry.position.y* gVoxelBlockSizeL;
-  float offset_z = point_in.z/gVoxelMetricSize - entry.position.z* gVoxelBlockSizeL;
-  int offset = round(offset_z + offset_y* gVoxelBlockSizeL + offset_x* gVoxelBlockSizeQ);
+  int offset_x = round(point_in.x / gVoxelMetricSize - entry.position.x * gVoxelBlockSizeL);
+  int offset_y = round(point_in.y / gVoxelMetricSize - entry.position.y * gVoxelBlockSizeL);
+  int offset_z = round(point_in.z / gVoxelMetricSize - entry.position.z * gVoxelBlockSizeL);
+  int offset = offset_z * gVoxelBlockSizeQ + offset_y * gVoxelBlockSizeL + offset_x;
+  if (voxel_block[offset].weight <= 0) {
+    *tsdf_out = 1;
+    return false;  /* Invalid */
+  }
   *tsdf_out = ReconstructionEngine::ShortToFloat(voxel_block[offset].sdf);
   return true;
 }
@@ -441,11 +476,13 @@ void RenderingEngine::TrilinearInterpolation(const VoxelBlockHashMap& index_in,
           entry.position.z == block.z &&
           entry.offset_in_array >= 0) {
         const Voxel* voxel_block = &src_in[entry.offset_in_array];
-        int offset = (c[i].z - block.z * gVoxelBlockSizeL) +
+        int offset = (c[i].z - block.z * gVoxelBlockSizeL) * gVoxelBlockSizeQ +
                      (c[i].y - block.y * gVoxelBlockSizeL) * gVoxelBlockSizeL +
-                     (c[i].x - block.x * gVoxelBlockSizeL) * gVoxelBlockSizeQ;
-        v[i] = ReconstructionEngine::ShortToFloat(voxel_block[offset].sdf);
-        break;  /* Found */
+                     (c[i].x - block.x * gVoxelBlockSizeL);
+        if (voxel_block[offset].weight > 0) {
+          v[i] = ReconstructionEngine::ShortToFloat(voxel_block[offset].sdf);
+          break;  /* Found */
+        }
       }
       if (entry.excess_offset_next > 0) {
         hash = gBlockHashOrderedArraySize + entry.excess_offset_next - 1;

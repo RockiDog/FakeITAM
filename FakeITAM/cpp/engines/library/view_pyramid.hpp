@@ -19,6 +19,7 @@ class ViewPyramid {
  public:
   ViewPyramid(int level_n, float top_icp_threshold, const View& bottom);
   ~ViewPyramid();
+  ViewPyramid& operator=(const ViewPyramid& other) { return *this; }
 
   int level_n() const { return level_n_; }
   const View* bottom() const { return bottom_; }

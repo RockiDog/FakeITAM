@@ -11,6 +11,7 @@
 #include <cmath>
 
 #include "global_config.hpp"
+#include "engines/log_engine.hpp"
 #include "engines/library/camera_pose.hpp"
 #include "engines/library/image_utils.hpp"
 #include "engines/library/point_cloud.hpp"
@@ -21,16 +22,25 @@ using namespace fakeitam::config;
 using namespace fakeitam::engine;
 using namespace fakeitam::utility;
 
+DepthTrackingEngine::~DepthTrackingEngine() {
+  if (view_pyramid_ != nullptr)
+    delete view_pyramid_;
+  view_pyramid_ = nullptr;
+}
+
 /* XXX Different with Infinitam */
 void DepthTrackingEngine::TrackCamera(const View& view_in,
                                       const PointCloud& global_pcl_in,
                                       const CameraPose& pose_in,
-                                            CameraPose* pose_out) const {
+                                            CameraPose* pose_out) {
   /* Set up initial parameters */
-  ViewPyramid view_pyramid(gDepthTrackIcpLevelNum, gDepthTrackTopIcpThreshold, view_in);
+  //ViewPyramid view_pyramid(gDepthTrackIcpLevelNum, gDepthTrackTopIcpThreshold, view_in);
+  if (view_pyramid_ != nullptr)
+    delete view_pyramid_;
+  view_pyramid_ = new ViewPyramid(gDepthTrackIcpLevelNum, gDepthTrackTopIcpThreshold, view_in);
   Matrix4f Ti_g_last_view = GetInverse(pose_in.m);
   Matrix4f Tg_last_estimate = pose_in.m;
-  Matrix4f Tg_last_good_estimate;
+  Matrix4f Tg_last_good_estimate = pose_in.m;
 
   Matrix<float, 6, 6> sigma_At_A, At_A;
   Matrix<float, 6, 1> sigma_At_b, At_b;
@@ -44,15 +54,14 @@ void DepthTrackingEngine::TrackCamera(const View& view_in,
   for (int level = gDepthTrackIcpLevelNum - 1; level >= 0; --level) {
     /* Set up level parameters */
     int icp_times = gDepthTrackIcpZetaMax[level];
-    View* view = view_pyramid.LevelAt(level);
-    float threshold = view_pyramid.IcpThresholdAtLevel(level);
+    View* view = view_pyramid_->LevelAt(level);
+    float threshold = view_pyramid_->IcpThresholdAtLevel(level);
     last_error_function = gDepthTrackMaxErrorPerPixel;
     lambda = 1;
     
     for (int z = 1; z <= icp_times; ++z) {
       SigmaAtAAndSigmaAtB(*view, Tg_last_estimate, Ti_g_last_view, global_pcl_in, threshold,
                           &sigma_At_A, &sigma_At_b, &valid_pixel_num, &error_function);
-      
       if (valid_pixel_num <= 0 || error_function > last_error_function) {
         /* XXX Why? */
         Tg_last_estimate = Tg_last_good_estimate;
@@ -74,7 +83,8 @@ void DepthTrackingEngine::TrackCamera(const View& view_in,
         break;
     }
   }
-  pose_out->m = Tg_last_estimate;
+  if (pose_out != nullptr)
+    pose_out->m = Tg_last_estimate;
 }
 
 /* TODO Test */
@@ -87,6 +97,8 @@ void DepthTrackingEngine::SigmaAtAAndSigmaAtB(const View& view_in,
                                                     Matrix<float, 6, 1>* sigma_At_b_out,
                                                     int* valid_pixel_num_out,
                                                     float* error_function_out) const {
+  (*valid_pixel_num_out) = 0;
+  (*error_function_out) = 0;
   const Vector2i& view_size = view_in.size;
   const Vector4f& view_intrinsics = view_in.intrinsics;
   const MemBlock<float>& view_depth_map = *view_in.depth_map;
@@ -135,11 +147,12 @@ void DepthTrackingEngine::ComputeAtAndB(const Matrix4f& Tg_last_estimate_in,
   float depth = view_depth_in[pixel_id];
 
   /* Abandon invalid depth */
-  if (depth <= gMathFloatEpsilon) {
+  if (depth <= 0) {
     (*valid_out) = false;
     return;
   }
 
+  const View* bottom = view_pyramid_->bottom();
   const float fx = view_intrinsics_in.x;
   const float fy = view_intrinsics_in.y;
   const float cx = view_intrinsics_in.z;
@@ -152,23 +165,19 @@ void DepthTrackingEngine::ComputeAtAndB(const Matrix4f& Tg_last_estimate_in,
   point_3d_l.z = depth;
 
   /* 4D global point estimate */
-  Matrix<float, 4, 1> point_4d_estimate_g {point_3d_l.x,
-                                           point_3d_l.y,
-                                           point_3d_l.z,
-                                           1};
+  Matrix<float, 4, 1> point_4d_estimate_g {point_3d_l.x, point_3d_l.y, point_3d_l.z, 1};
   point_4d_estimate_g = Tg_last_estimate_in * point_4d_estimate_g;
 
   /* Abandon unreliable pixel reprojection */
-  Matrix<float, 4, 1> temp_point_4d = Ti_g_last_view_in * point_4d_estimate_g;
-  Matrix<float, 4, 1> temp_point_3d {temp_point_4d(0, 0), temp_point_4d(1, 0),
-                                     temp_point_4d(2, 0), temp_point_4d(3, 0)};
-  Vector2f pixel_2d_reproj;
-  pixel_2d_reproj.x = temp_point_3d(0, 0) / temp_point_3d(2, 0) * fx + cx;
-  pixel_2d_reproj.y = temp_point_3d(1, 0) / temp_point_3d(2, 0) * fy + cy;
+  Matrix<float, 4, 1> point_4d = Ti_g_last_view_in * point_4d_estimate_g;
+  Vector2f pixel_2d_reproj(
+    point_4d(0, 0) / point_4d(2, 0) * bottom->intrinsics.x + bottom->intrinsics.z,
+    point_4d(1, 0) / point_4d(2, 0) * bottom->intrinsics.y + bottom->intrinsics.w
+  );
   if (pixel_2d_reproj.x <= -gDepthTrackMaxPixelError ||
       pixel_2d_reproj.y <= -gDepthTrackMaxPixelError ||
-      pixel_2d_reproj.x >= view_size_in.x + gDepthTrackMaxPixelError ||
-      pixel_2d_reproj.y >= view_size_in.y + gDepthTrackMaxPixelError) {
+      pixel_2d_reproj.x >= bottom->size.x + gDepthTrackMaxPixelError ||
+      pixel_2d_reproj.y >= bottom->size.y + gDepthTrackMaxPixelError) {
     (*valid_out) = false;
     return;
   }
@@ -182,20 +191,18 @@ void DepthTrackingEngine::ComputeAtAndB(const Matrix4f& Tg_last_estimate_in,
   /* 3D global point & narmal prediction, from world model */
   const MemBlock<Vector4f>* global_vertices = global_pcl_in.locations();
   const MemBlock<Vector4f>* global_normals = global_pcl_in.normals();
-  Vector4f point_4d_prediction_g;
-  Vector4f normal_4d_prediction_g;
-  point_4d_prediction_g = BilinearInterpolationWithHoles(*global_vertices, pixel_2d_reproj, view_size_in);
-  normal_4d_prediction_g = BilinearInterpolationWithHoles(*global_normals, pixel_2d_reproj, view_size_in);
+  Vector4f point_4d_prediction_g = BilinearInterpolationWithHoles(*global_vertices, pixel_2d_reproj, bottom->size);
+  Vector4f normal_4d_prediction_g = BilinearInterpolationWithHoles(*global_normals, pixel_2d_reproj, bottom->size);
   if (normal_4d_prediction_g.w < 0 || point_4d_prediction_g.w < 0) {
     (*valid_out) = false;
     return;
   }
-  Vector3f point_3d_prediction_g(point_4d_prediction_g.x, point_4d_prediction_g.y, point_4d_prediction_g.z);
-  Vector3f normal_prediction_g(normal_4d_prediction_g.x, normal_4d_prediction_g.y, normal_4d_prediction_g.z);
+  Vector3f point_3d_prediction_g = point_4d_prediction_g.ProjectTo3d();
+  Vector3f normal_prediction_g = normal_4d_prediction_g.ProjectTo3d();
 
   Vector3f point_3d_diff = point_3d_prediction_g - point_3d_estimate_g;
-  float dist = point_3d_diff.GetNorm2();
-  if (dist >= dist_threshold_in + gMathFloatEpsilon) {
+  float dist2 = point_3d_diff.GetNorm2();
+  if (dist2 >= dist_threshold_in) {
     (*valid_out) = false;
     return;
   }
@@ -211,6 +218,7 @@ void DepthTrackingEngine::ComputeAtAndB(const Matrix4f& Tg_last_estimate_in,
   Matrix<float, 3, 1> temp_point_3d_diff = point_3d_diff;
   Matrix<float, 3, 1> temp_normal_prediction_g = normal_prediction_g;
   (*b_out) = temp_normal_prediction_g.GetTranspose() * temp_point_3d_diff;
+  (*valid_out) = true;
   (*error_function_out) = ((*b_out) * (*b_out))(0, 0);
 }
 
