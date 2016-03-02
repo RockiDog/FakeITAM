@@ -46,11 +46,13 @@ RenderingEngine::~RenderingEngine() {
 }
 
 /* TODO Test */
+static int cnt = 0;
 void RenderingEngine::FullRenderIcpMaps(const Scene& scene_in,
                                         const View& view_in,
                                         const CameraPose& pose_in,
                                               PointCloud* pcl_out) {
   tsdf_map->ResetData();
+  cnt = 0;
 
   const vector<int>& visible_blocks = scene_in.visible_list();
   const Matrix4f& Tg = pose_in.m;
@@ -66,6 +68,8 @@ void RenderingEngine::FullRenderIcpMaps(const Scene& scene_in,
     pcl_out->normals()->CopyBytesFrom(normals.GetData(), normals.byte_capacity());
     pcl_out->set_camera_pose(pose_in);
   }
+
+  //LOG->WriteLine()->WriteLine(E, cnt);
 }
 
 /* TODO Test */
@@ -252,7 +256,7 @@ void RenderingEngine::FullRaycast(
       end_g.w = 1;
       end_g = Tg_in * end_g;
       Vector4f& intersection = (*points_out)[x + y * view_in.size.x];
-      CastRay(scene_in, start_g, end_g, x, y, &intersection);
+      CastRay(scene_in, start_g, end_g, x, y, &intersection, intrinsics);
     }
   }
 }
@@ -299,7 +303,8 @@ void RenderingEngine::CastRay(const Scene& scene_in,
                               const Vector4f& start_g_in,
                               const Vector4f& end_g_in,
                                     int x, int y,
-                                    Vector4f* point_out) {
+                                    Vector4f* point_out,
+                              const Vector4f& intrinsics_in) {
   float total_length = (end_g_in - start_g_in).GetNorm();
   float length = 0;
   Vector3f point {start_g_in.x, start_g_in.y, start_g_in.z};
@@ -308,7 +313,7 @@ void RenderingEngine::CastRay(const Scene& scene_in,
   float tsdf = 1;
   while (length < total_length) {
     float step_length;
-    if (ReadNearestTsdf(scene_in, point, &tsdf) == false) {
+    if (ReadNearestTsdf(scene_in, point, &tsdf, intrinsics_in) == false) {
       /* Jump by block size */
       step_length = gVoxelBlockSizeL * gVoxelMetricSize;
     } else {
@@ -331,7 +336,6 @@ void RenderingEngine::CastRay(const Scene& scene_in,
     length += step_length;
     point = point + one_step * step_length;
   }
-  //(*tsdf_map)[x + y * 640] = fabs(tsdf) * 255;
   if (tsdf <= 0) {
     /* Found */
     point_out->x = point.x;
@@ -403,7 +407,8 @@ bool RenderingEngine::GetBoundingBox(const Vector3i& block_in,
 
 bool RenderingEngine::ReadNearestTsdf(const Scene& scene_in,
                                       const Vector3f& point_in,
-                                            float* tsdf_out) {
+                                            float* tsdf_out,
+                                      const utility::Vector4f& intrinsics_in) {
   const float block_metric_size = gVoxelMetricSize * gVoxelBlockSizeL;
   const VoxelBlockHashMap& index = *(scene_in.index());
   const MemBlock<Voxel>& voxel_array = *(scene_in.local_voxel_array());
@@ -433,6 +438,16 @@ bool RenderingEngine::ReadNearestTsdf(const Scene& scene_in,
   int offset_z = round(point_in.z / gVoxelMetricSize - entry.position.z * gVoxelBlockSizeL);
   int offset = offset_z * gVoxelBlockSizeQ + offset_y * gVoxelBlockSizeL + offset_x;
   if (voxel_block[offset].weight <= 0) {
+    /* Debug info */ {
+      static float fx = intrinsics_in.x;
+      static float fy = intrinsics_in.y;
+      static float cx = intrinsics_in.z;
+      static float cy = intrinsics_in.w;
+      float xx = point_in.x / point_in.z * fx + cx;
+      float yy = point_in.y / point_in.z * fy + cy;
+      float tsdf = ReconstructionEngine::ShortToFloat(voxel_block[offset].sdf);
+      (*tsdf_map)[xx + yy * 640] = 255 - (tsdf >= 0 ? (tsdf <= 1 ? tsdf * 255 : 255) : 0);
+    }
     *tsdf_out = 1;
     return false;  /* Invalid */
   }
@@ -488,7 +503,7 @@ void RenderingEngine::TrilinearInterpolation(const VoxelBlockHashMap& index_in,
         hash = gBlockHashOrderedArraySize + entry.excess_offset_next - 1;
         entry = index_in[hash];
       } else {
-        v[i] = 1;
+        v[i] = 0;
         break;  /* Not found */
       }
     }

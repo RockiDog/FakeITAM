@@ -57,8 +57,8 @@ const int gVoxelBlockSizeC = 512;      /* cubic */
 
 const float gRaycastRangeZMin = 0.05;
 const float gRaycastRangeZMax = 999999.9;
-const float gRaycastSmallTsdfMin = -0.9;
-const float gRaycastSmallTsdfMax = 0.9;
+const float gRaycastSmallTsdfMin = -0.5;
+const float gRaycastSmallTsdfMax = 0.1;
 const int gBoundBoxFragmentSizeL = 16;  /* linear */
 const int gBoundBoxMaxFragmentNum = 65536 << 2;
 const int gBoundBoxSubsample = 8;

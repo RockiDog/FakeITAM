@@ -132,8 +132,11 @@ void DisplayFunc() {
     
     /* Display point cloud */
     glBindTexture(GL_TEXTURE_2D, textures[2]);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_main_engine->view_size().x, g_main_engine->view_size().y,
-                 0, GL_RGBA, GL_UNSIGNED_BYTE, g_pcl_image->GetData());
+    //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_main_engine->view_size().x, g_main_engine->view_size().y,
+    //             0, GL_RGBA, GL_UNSIGNED_BYTE, g_pcl_image->GetData());
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE,
+                 g_main_engine->view_size().x, g_main_engine->view_size().y,
+                 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, g_main_engine->GetReconstructionEngine()->tsdf_map->GetData());
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBegin(GL_QUADS); {
@@ -169,18 +172,18 @@ void DisplayFunc() {
     }
     
     /* Display ray length range */
-    glBindTexture(GL_TEXTURE_2D, textures[6]);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE,
-                 g_main_engine->view_size().x, g_main_engine->view_size().y,
-                 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, g_main_engine->GetReconstructionEngine()->tsdf_map->GetData());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glBegin(GL_QUADS); {
-      glTexCoord2f(0, 0); glVertex2f(g_win_width, g_win_height / 3 * 2);                    /* top-left */
-      glTexCoord2f(1, 0); glVertex2f(g_win_width + g_win_width / 3, g_win_height / 3 * 2);  /* top-right */
-      glTexCoord2f(1, 1); glVertex2f(g_win_width + g_win_width / 3, g_win_height / 3);      /* bottom-right */
-      glTexCoord2f(0, 1); glVertex2f(g_win_width, g_win_height / 3);                        /* bottom-left */
-    } glEnd();
+  //glBindTexture(GL_TEXTURE_2D, textures[6]);
+  //glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE,
+  //             g_main_engine->view_size().x, g_main_engine->view_size().y,
+  //             0, GL_LUMINANCE, GL_UNSIGNED_BYTE, g_main_engine->GetReconstructionEngine()->tsdf_map->GetData());
+  //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  //glBegin(GL_QUADS); {
+  //  glTexCoord2f(0, 0); glVertex2f(g_win_width, g_win_height / 3 * 2);                    /* top-left */
+  //  glTexCoord2f(1, 0); glVertex2f(g_win_width + g_win_width / 3, g_win_height / 3 * 2);  /* top-right */
+  //  glTexCoord2f(1, 1); glVertex2f(g_win_width + g_win_width / 3, g_win_height / 3);      /* bottom-right */
+  //  glTexCoord2f(0, 1); glVertex2f(g_win_width, g_win_height / 3);                        /* bottom-left */
+  //} glEnd();
     glBindTexture(GL_TEXTURE_2D, textures[7]);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE,
                  g_main_engine->view_size().x, g_main_engine->view_size().y,
@@ -188,10 +191,14 @@ void DisplayFunc() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBegin(GL_QUADS); {
-      glTexCoord2f(0, 0); glVertex2f(g_win_width, g_win_height / 3);                    /* top-left */
-      glTexCoord2f(1, 0); glVertex2f(g_win_width + g_win_width / 3, g_win_height / 3);  /* top-right */
-      glTexCoord2f(1, 1); glVertex2f(g_win_width + g_win_width / 3, 0);                 /* bottom-right */
-      glTexCoord2f(0, 1); glVertex2f(g_win_width, 0);                                   /* bottom-left */
+    //glTexCoord2f(0, 0); glVertex2f(g_win_width, g_win_height / 3);                    /* top-left */
+    //glTexCoord2f(1, 0); glVertex2f(g_win_width + g_win_width / 3, g_win_height / 3);  /* top-right */
+    //glTexCoord2f(1, 1); glVertex2f(g_win_width + g_win_width / 3, 0);                 /* bottom-right */
+    //glTexCoord2f(0, 1); glVertex2f(g_win_width, 0);                                   /* bottom-left */
+      glTexCoord2f(0, 0); glVertex2f(g_win_width, g_win_height / 3 * 2);                        /* top-left */
+      glTexCoord2f(1, 0); glVertex2f(g_win_width + g_win_width / 3 * 2, g_win_height / 3 * 2);  /* top-right */
+      glTexCoord2f(1, 1); glVertex2f(g_win_width + g_win_width / 3 * 2, 0);                     /* bottom-right */
+      glTexCoord2f(0, 1); glVertex2f(g_win_width, 0);                                           /* bottom-left */
     } glEnd();
     
     /* Display point cloud */
@@ -257,11 +264,11 @@ int main(int argc, char* argv[]) {
   glutInit(&argc, argv);
   glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
 
-  glutInitWindowSize(g_win_width + g_win_width / 3, g_win_height);
+  glutInitWindowSize(g_win_width + g_win_width / 3 * 2, g_win_height);
   glutCreateWindow("Test Window");
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
-  glOrtho(0, g_win_width + g_win_width / 3, -g_win_height / 3, g_win_height / 3 * 2, 0, 1);
+  glOrtho(0, g_win_width + g_win_width / 3 * 2, -g_win_height / 3, g_win_height / 3 * 2, 0, 10);
 
   glEnable(GL_TEXTURE_2D);
   glGenTextures(texture_n, textures);

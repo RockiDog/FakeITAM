@@ -40,6 +40,7 @@ ReconstructionEngine::~ReconstructionEngine() {
 void ReconstructionEngine::ResetWorldScene(Scene* scene_out) { }
 
 /* TODO Test */
+static int cnt = 0;
 void ReconstructionEngine::AllocateWorldSceneFromView(const View& view_in,
                                                       const CameraPose& camera_pose_in,
                                                             Scene* scene_out) {
@@ -203,6 +204,7 @@ void ReconstructionEngine::UpdateHashEntriesAndBlockCache(const View& view_in,
 void ReconstructionEngine::IntegrateVoxelsToWorldScene(const View& view_in,
                                                        const CameraPose& camera_pose_in,
                                                              Scene* scene_out) {
+  cnt = 0;
   const MemBlock<float>& depth = *(view_in.depth_map);
   const Vector2i& view_size = view_in.size;
   const Vector4f& intrinsics = view_in.intrinsics;
@@ -239,6 +241,7 @@ void ReconstructionEngine::IntegrateVoxelsToWorldScene(const View& view_in,
       }
     }
   }
+  LOG->WriteLine()->WriteLine(E, cnt);
 }
 
 /* TODO Test */
@@ -317,8 +320,10 @@ void ReconstructionEngine::UpdateVoxelTsdfAndWeight(const Vector2i& view_size_in
   int new_W = 1;
 
   float new_tsdf = (old_F * old_W + new_F * new_W) / (old_W + new_W);
-  new_tsdf = 0;
+  //new_tsdf = 0;
   voxel_out->sdf = FloatToShort(new_tsdf);
   voxel_out->weight = (old_W + new_W) > max_W ? max_W : (old_W + new_W);
-  (*tsdf_map)[pixel.x + pixel.y * view_size_in.x] = 255 - fabs(new_tsdf) * 255;
+  if ((255 - (new_tsdf >= 0 ? (new_tsdf <= 1 ? new_tsdf * 255 : 255) : 0))
+      > (*tsdf_map)[pixel.x + pixel.y * view_size_in.x])
+    (*tsdf_map)[pixel.x + pixel.y * view_size_in.x] = 255 - (new_tsdf >= 0 ? (new_tsdf <= 1 ? new_tsdf * 255 : 255) : 0);
 }
