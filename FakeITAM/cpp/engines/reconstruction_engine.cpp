@@ -308,7 +308,7 @@ void ReconstructionEngine::UpdateVoxelTsdfAndWeight(const Vector2i& view_size_in
   float fx = intrinsics_in(0, 0), fy = intrinsics_in(1, 1);
   float dx = intrinsics_in(0, 2), dy = intrinsics_in(1, 2);
   float lambda = Vector3f((pixel.x - dx)/fx, (pixel.y - dy)/fy, 1).GetNorm();
-  float eta = (camera_coordinates_in - point_g_in.ProjectTo3d()).GetNorm() / lambda - depth;
+  float eta = depth - (camera_coordinates_in - point_g_in.ProjectTo3d()).GetNorm() / lambda;
   if (eta <= -mu)
     return;
 
@@ -323,7 +323,7 @@ void ReconstructionEngine::UpdateVoxelTsdfAndWeight(const Vector2i& view_size_in
   //new_tsdf = 0;
   voxel_out->sdf = FloatToShort(new_tsdf);
   voxel_out->weight = (old_W + new_W) > max_W ? max_W : (old_W + new_W);
-  if ((255 - (new_tsdf >= 0 ? (new_tsdf <= 1 ? new_tsdf * 255 : 255) : 0))
-      > (*tsdf_map)[pixel.x + pixel.y * view_size_in.x])
-    (*tsdf_map)[pixel.x + pixel.y * view_size_in.x] = 255 - (new_tsdf >= 0 ? (new_tsdf <= 1 ? new_tsdf * 255 : 255) : 0);
+  if (255 - fabs(new_tsdf) * 255 > (*tsdf_map)[pixel.x + pixel.y * view_size_in.x])
+    (*tsdf_map)[pixel.x + pixel.y * view_size_in.x] = 255 - (fabs(new_tsdf) <= 1 ? fabs(new_tsdf) * 255 : 255);
+  ++cnt;
 }

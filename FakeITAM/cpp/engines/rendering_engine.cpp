@@ -438,19 +438,20 @@ bool RenderingEngine::ReadNearestTsdf(const Scene& scene_in,
   int offset_z = round(point_in.z / gVoxelMetricSize - entry.position.z * gVoxelBlockSizeL);
   int offset = offset_z * gVoxelBlockSizeQ + offset_y * gVoxelBlockSizeL + offset_x;
   if (voxel_block[offset].weight <= 0) {
-    /* Debug info */ {
-      static float fx = intrinsics_in.x;
-      static float fy = intrinsics_in.y;
-      static float cx = intrinsics_in.z;
-      static float cy = intrinsics_in.w;
-      float xx = point_in.x / point_in.z * fx + cx;
-      float yy = point_in.y / point_in.z * fy + cy;
-      float tsdf = ReconstructionEngine::ShortToFloat(voxel_block[offset].sdf);
-      (*tsdf_map)[xx + yy * 640] = 255 - (tsdf >= 0 ? (tsdf <= 1 ? tsdf * 255 : 255) : 0);
-    }
     *tsdf_out = 1;
     return false;  /* Invalid */
   }
+  ///* Debug info */ {
+  //  static float fx = intrinsics_in.x;
+  //  static float fy = intrinsics_in.y;
+  //  static float cx = intrinsics_in.z;
+  //  static float cy = intrinsics_in.w;
+  //  float xx = point_in.x / point_in.z * fx + cx;
+  //  float yy = point_in.y / point_in.z * fy + cy;
+  //  float tsdf = ReconstructionEngine::ShortToFloat(voxel_block[offset].sdf);
+  //  if (255 - fabs(tsdf) * 255 > (*tsdf_map)[xx + yy * 640])
+  //    (*tsdf_map)[xx + yy * 640] = 255 - (fabs(tsdf) <= 1 ? fabs(tsdf) * 255 : 255);
+  //}
   *tsdf_out = ReconstructionEngine::ShortToFloat(voxel_block[offset].sdf);
   return true;
 }
@@ -503,7 +504,7 @@ void RenderingEngine::TrilinearInterpolation(const VoxelBlockHashMap& index_in,
         hash = gBlockHashOrderedArraySize + entry.excess_offset_next - 1;
         entry = index_in[hash];
       } else {
-        v[i] = 0;
+        v[i] = 1;
         break;  /* Not found */
       }
     }

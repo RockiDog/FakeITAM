@@ -56,6 +56,20 @@ float g_win_height = 0;
 const GLsizei texture_n = 9;
 GLuint textures[texture_n];
 
+bool g_auto_rotate = false;
+float g_rotate_angle_v = 0;
+float g_rotate_angle_h = 0;
+float g_translate_x = 0;
+float g_translate_y = 0;
+float g_translate_z = 0;
+float g_scale = 1;
+
+bool g_left_pressed = false, g_left_released = true;
+bool g_right_pressed = false, g_right_released = true;
+bool g_middle_pressed = false, g_middle_released = true;
+
+int g_mouse_x, g_mouse_y;
+
 }
 
 void ConvertDepthsToGreyscales(const ImageMono32f& depths, ImageMono8u* greyscales) {
@@ -99,10 +113,22 @@ void DisplayFunc() {
     return;
 
   /* Do the actual drawing */
-  glClear(GL_COLOR_BUFFER_BIT);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
+
+  glPushMatrix(); {
+    glColor3f(1, 0, 0);
+    glTranslatef(g_win_width + g_win_width / 3 + 100, -100, -100);
+    glRotatef(180, 1, 0, 0);
+    glTranslatef(g_translate_x, g_translate_y, g_translate_z);
+    glRotatef(g_rotate_angle_h, 0, 1, 0);
+    glRotatef(g_rotate_angle_v, 1, 0, 0);
+    glutWireTeapot(-50 * g_scale);
+    glColor3f(1, 1, 1);
+  }; glPopMatrix();
+
   glPushMatrix(); {
     /* Display RGB image */
     glBindTexture(GL_TEXTURE_2D, textures[0]);
@@ -184,52 +210,137 @@ void DisplayFunc() {
   //  glTexCoord2f(1, 1); glVertex2f(g_win_width + g_win_width / 3, g_win_height / 3);      /* bottom-right */
   //  glTexCoord2f(0, 1); glVertex2f(g_win_width, g_win_height / 3);                        /* bottom-left */
   //} glEnd();
-    glBindTexture(GL_TEXTURE_2D, textures[7]);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE,
-                 g_main_engine->view_size().x, g_main_engine->view_size().y,
-                 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, g_main_engine->GetRenderingEngine()->tsdf_map->GetData());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glBegin(GL_QUADS); {
-    //glTexCoord2f(0, 0); glVertex2f(g_win_width, g_win_height / 3);                    /* top-left */
-    //glTexCoord2f(1, 0); glVertex2f(g_win_width + g_win_width / 3, g_win_height / 3);  /* top-right */
-    //glTexCoord2f(1, 1); glVertex2f(g_win_width + g_win_width / 3, 0);                 /* bottom-right */
-    //glTexCoord2f(0, 1); glVertex2f(g_win_width, 0);                                   /* bottom-left */
-      glTexCoord2f(0, 0); glVertex2f(g_win_width, g_win_height / 3 * 2);                        /* top-left */
-      glTexCoord2f(1, 0); glVertex2f(g_win_width + g_win_width / 3 * 2, g_win_height / 3 * 2);  /* top-right */
-      glTexCoord2f(1, 1); glVertex2f(g_win_width + g_win_width / 3 * 2, 0);                     /* bottom-right */
-      glTexCoord2f(0, 1); glVertex2f(g_win_width, 0);                                           /* bottom-left */
-    } glEnd();
+  //glBindTexture(GL_TEXTURE_2D, textures[7]);
+  //glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE,
+  //             g_main_engine->view_size().x, g_main_engine->view_size().y,
+  //             0, GL_LUMINANCE, GL_UNSIGNED_BYTE, g_main_engine->GetRenderingEngine()->tsdf_map->GetData());
+  //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  //glBegin(GL_QUADS); {
+  ////glTexCoord2f(0, 0); glVertex2f(g_win_width, g_win_height / 3);                    /* top-left */
+  ////glTexCoord2f(1, 0); glVertex2f(g_win_width + g_win_width / 3, g_win_height / 3);  /* top-right */
+  ////glTexCoord2f(1, 1); glVertex2f(g_win_width + g_win_width / 3, 0);                 /* bottom-right */
+  ////glTexCoord2f(0, 1); glVertex2f(g_win_width, 0);                                   /* bottom-left */
+  //  glTexCoord2f(0, 0); glVertex2f(g_win_width, g_win_height / 3 * 2);                        /* top-left */
+  //  glTexCoord2f(1, 0); glVertex2f(g_win_width + g_win_width / 3 * 2, g_win_height / 3 * 2);  /* top-right */
+  //  glTexCoord2f(1, 1); glVertex2f(g_win_width + g_win_width / 3 * 2, 0);                     /* bottom-right */
+  //  glTexCoord2f(0, 1); glVertex2f(g_win_width, 0);                                           /* bottom-left */
+  //} glEnd();
     
     /* Display point cloud */
-    glBindTexture(GL_TEXTURE_2D, textures[8]);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_main_engine->view_size().x, g_main_engine->view_size().y,
-                 0, GL_RGBA, GL_UNSIGNED_BYTE, g_pcl_image->GetData());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glBegin(GL_QUADS); {
-      glTexCoord2f(0, 0); glVertex2f(g_win_width, 0);                                    /* top-left */
-      glTexCoord2f(1, 0); glVertex2f(g_win_width + g_win_width / 3, 0);                  /* top-right */
-      glTexCoord2f(1, 1); glVertex2f(g_win_width + g_win_width / 3, -g_win_height / 3);  /* bottom-right */
-      glTexCoord2f(0, 1); glVertex2f(g_win_width, -g_win_height / 3);                    /* bottom-left */
-    } glEnd();
+  //glBindTexture(GL_TEXTURE_2D, textures[8]);
+  //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_main_engine->view_size().x, g_main_engine->view_size().y,
+  //             0, GL_RGBA, GL_UNSIGNED_BYTE, g_pcl_image->GetData());
+  //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  //glBegin(GL_QUADS); {
+  //  glTexCoord2f(0, 0); glVertex2f(g_win_width, 0);                                    /* top-left */
+  //  glTexCoord2f(1, 0); glVertex2f(g_win_width + g_win_width / 3, 0);                  /* top-right */
+  //  glTexCoord2f(1, 1); glVertex2f(g_win_width + g_win_width / 3, -g_win_height / 3);  /* bottom-right */
+  //  glTexCoord2f(0, 1); glVertex2f(g_win_width, -g_win_height / 3);                    /* bottom-left */
+  //} glEnd();
   } glPopMatrix();
 
   glutSwapBuffers();
 }
 
 void KeyboardFunc(unsigned char key, int x, int y) {
-  if (key == 'n' || key == 'N' || key == 13) {
-    g_stalled = false;
-    g_auto = false;
-  } else if (key == 'a' || key == 'A') {
-    g_auto ^= 1;
-  } else if (key == 'q' || key == 'Q' || key == 27) {
-    exit(0);
+  switch (key) {
+    case 'n' : { g_stalled = false; g_auto = false; } break;
+    case 'N' : { g_stalled = false; g_auto = false; } break;
+    case 13  : { g_stalled = false; g_auto = false; } break;
+    case 'a' : { g_auto ^= 1; } break;
+    case 'A' : { g_auto ^= 1; } break;
+    case 'q' : { exit(0); } break;
+    case 'Q' : { exit(0); } break;
+    case 27  : { exit(0); } break;
+    
+    case 'r' : { g_auto_rotate ^= 1; } break;
+    case 'R' : { g_auto_rotate ^= 1; } break;
+  }
+}
+
+void SpecialKeyFunc(int key, int x, int y) {
+  switch (key) {
+    case GLUT_KEY_LEFT  : { if (g_right_released) g_translate_x -= 10; } break;
+    case GLUT_KEY_RIGHT : { if (g_right_released) g_translate_x += 10; } break;
+    case GLUT_KEY_UP    : { if (g_right_released) g_translate_y -= 10; } break;
+    case GLUT_KEY_DOWN  : { if (g_right_released) g_translate_y += 10; } break;
+  }
+}
+
+void MouseFunc(int button,int state,int x,int y) {
+  switch (button) {
+    case GLUT_LEFT_BUTTON : {
+      if (state == GLUT_DOWN) {
+        if (g_left_released) {
+          g_mouse_x = x;
+          g_mouse_y = y;
+        }
+        g_left_pressed = true;
+        g_left_released = false;
+      } else if (state == GLUT_UP) {
+        g_left_pressed = false;
+        g_left_released = true;;
+      }
+    } break;
+    case GLUT_RIGHT_BUTTON : {
+      if (state == GLUT_DOWN) {
+        if (g_right_released) {
+          g_mouse_x = x;
+          g_mouse_y = y;
+        }
+        g_right_pressed = true;
+        g_right_released = false;
+      } else if (state == GLUT_UP) {
+        g_right_pressed = false;
+        g_right_released = true;
+      }
+    } break;
+    case GLUT_MIDDLE_BUTTON : {
+      if (g_middle_released) {
+        g_mouse_x = x;
+        g_mouse_y = y;
+      }
+      g_middle_pressed = true;
+      g_middle_released = false;
+    } break;
+  }
+}
+
+void MouseMotionFunc(int x, int y) {
+  if (g_left_pressed) {
+    g_rotate_angle_h += x - g_mouse_x;
+    g_rotate_angle_v -= y - g_mouse_y;
+    g_mouse_x = x;
+    g_mouse_y = y;
+  }
+
+  if (g_right_pressed) {
+    g_translate_x += x - g_mouse_x;
+    g_translate_y += y - g_mouse_y;
+    while (g_translate_x >= 360) g_translate_x -= 360;
+    while (g_translate_y >= 360) g_translate_y -= 360;
+    while (g_translate_x < 0) g_translate_x += 360;
+    while (g_translate_y < 0) g_translate_y += 360;
+    g_mouse_x = x;
+    g_mouse_y = y;
+  }
+
+  if (g_middle_pressed) {
+    g_translate_z += y - g_mouse_y;
+    g_scale += (x - g_mouse_x) / 20.0;
+    if (g_scale < 0.1) g_scale = 0.1;
+    if (g_scale > 5.0) g_scale = 5.0;
+    g_mouse_x = x;
+    g_mouse_y = y;
   }
 }
 
 void IdleFunc() {
+  if (g_auto_rotate && g_left_released)
+    g_rotate_angle_h = g_rotate_angle_h == 360 ? 1 : g_rotate_angle_h + 1;
+
   if (g_stalled == false || g_auto == true) {
     g_main_engine->ProcessOneFrame();
     g_main_engine->GetImageEngine()->CurrentRGBDFrame(&g_rgb_image, nullptr);
@@ -243,8 +354,9 @@ void IdleFunc() {
         g_main_engine->camera_pose()->m,
         g_pcl_image);
     g_stalled = true;
-    glutPostRedisplay();
   }
+
+  glutPostRedisplay();
 }
 
 int main(int argc, char* argv[]) {
@@ -268,13 +380,17 @@ int main(int argc, char* argv[]) {
   glutCreateWindow("Test Window");
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
-  glOrtho(0, g_win_width + g_win_width / 3 * 2, -g_win_height / 3, g_win_height / 3 * 2, 0, 10);
+  glOrtho(0, g_win_width + g_win_width / 3 * 2, -g_win_height / 3, g_win_height / 3 * 2, 0, 1000);
 
+  glEnable(GL_DEPTH_TEST);
   glEnable(GL_TEXTURE_2D);
   glGenTextures(texture_n, textures);
 
-  glutDisplayFunc(DisplayFunc);
   glutKeyboardFunc(KeyboardFunc);
+  glutSpecialFunc(SpecialKeyFunc);
+  glutMouseFunc(MouseFunc);
+  glutMotionFunc(MouseMotionFunc);
+  glutDisplayFunc(DisplayFunc);
   glutIdleFunc(IdleFunc);
   try {
     glutMainLoop();
