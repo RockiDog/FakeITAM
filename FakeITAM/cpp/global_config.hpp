@@ -61,7 +61,7 @@ const float gRaycastSmallTsdfMin = -0.5;
 const float gRaycastSmallTsdfMax = 0.1;
 const int gBoundBoxFragmentSizeL = 16;  /* linear */
 const int gBoundBoxMaxFragmentNum = 65536 << 2;
-const int gBoundBoxSubsample = 8;
+const int gBoundBoxSubsample = 1;
 
 const int gRenderMaxPointCloudAge = 5;
 const float gRenderMaxCameraDistance2 = 0.0005;  /* in meter^2 */

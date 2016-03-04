@@ -6,6 +6,11 @@
 //  Copyright © 2015年 Soap. All rights reserved.
 //
 
+
+#ifndef GL_GLEXT_PROTOTYPES
+#define GL_GLEXT_PROTOTYPES
+#endif
+
 #ifdef __APPLE__
 #include <OpenGL/gl.h>
 #include <OpenGL/glu.h>
@@ -13,6 +18,7 @@
 
 #elif __linux__
 #include <GL/gl.h>
+#include <GL/glext.h>
 #include <GL/glu.h>
 #include <GL/glut.h>
 #endif
@@ -43,6 +49,7 @@ MainEngine* g_main_engine = nullptr;
 const ImageRGB8u* g_rgb_image = nullptr;
 const ImageMono32f* g_depth_image = nullptr;
 const ViewPyramid* g_view_pyramid = nullptr;
+GLuint g_pcl_vbo;
 
 ImageMono8u* g_greyscale_image = nullptr;
 ImageRGBA8u* g_pcl_image = nullptr;
@@ -114,21 +121,10 @@ void DisplayFunc() {
 
   /* Do the actual drawing */
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
 
-  glPushMatrix(); {
-    glColor3f(1, 0, 0);
-    glTranslatef(g_win_width + g_win_width / 3 + 100, -100, -100);
-    glRotatef(180, 1, 0, 0);
-    glTranslatef(g_translate_x, g_translate_y, g_translate_z);
-    glRotatef(g_rotate_angle_h, 0, 1, 0);
-    glRotatef(g_rotate_angle_v, 1, 0, 0);
-    glutWireTeapot(-50 * g_scale);
-    glColor3f(1, 1, 1);
-  }; glPopMatrix();
-
+  glEnable(GL_TEXTURE_2D);
   glPushMatrix(); {
     /* Display RGB image */
     glBindTexture(GL_TEXTURE_2D, textures[0]);
@@ -137,10 +133,10 @@ void DisplayFunc() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBegin(GL_QUADS); {
-      glTexCoord2f(0, 0); glVertex2f(0, g_win_height / 3 * 2);                /* top-left */
-      glTexCoord2f(1, 0); glVertex2f(g_win_width / 3, g_win_height / 3 * 2);  /* top-right */
-      glTexCoord2f(1, 1); glVertex2f(g_win_width / 3, g_win_height / 3);      /* bottom-right */
-      glTexCoord2f(0, 1); glVertex2f(0, g_win_height / 3);                    /* bottom-left */
+      glTexCoord2f(0, 0); glVertex3f(0, g_win_height / 3 * 2, -100);                /* top-left */
+      glTexCoord2f(1, 0); glVertex3f(g_win_width / 3, g_win_height / 3 * 2, -100);  /* top-right */
+      glTexCoord2f(1, 1); glVertex3f(g_win_width / 3, g_win_height / 3, -100);      /* bottom-right */
+      glTexCoord2f(0, 1); glVertex3f(0, g_win_height / 3, -100);                    /* bottom-left */
     } glEnd();
     
     /* Display depth frame */
@@ -150,26 +146,37 @@ void DisplayFunc() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBegin(GL_QUADS); {
-      glTexCoord2f(0, 0); glVertex2f(0, g_win_height / 3);                /* top-left */
-      glTexCoord2f(1, 0); glVertex2f(g_win_width / 3, g_win_height / 3);  /* top-right */
-      glTexCoord2f(1, 1); glVertex2f(g_win_width / 3, 0);                 /* bottom-right */
-      glTexCoord2f(0, 1); glVertex2f(0, 0);                               /* bottom-left */
+      glTexCoord2f(0, 0); glVertex3f(0, g_win_height / 3, -100);                /* top-left */
+      glTexCoord2f(1, 0); glVertex3f(g_win_width / 3, g_win_height / 3, -100);  /* top-right */
+      glTexCoord2f(1, 1); glVertex3f(g_win_width / 3, 0, -100);                 /* bottom-right */
+      glTexCoord2f(0, 1); glVertex3f(0, 0, -100);                               /* bottom-left */
     } glEnd();
     
-    /* Display point cloud */
+    /* Display reconstruction result */
     glBindTexture(GL_TEXTURE_2D, textures[2]);
-    //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_main_engine->view_size().x, g_main_engine->view_size().y,
-    //             0, GL_RGBA, GL_UNSIGNED_BYTE, g_pcl_image->GetData());
     glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE,
                  g_main_engine->view_size().x, g_main_engine->view_size().y,
                  0, GL_LUMINANCE, GL_UNSIGNED_BYTE, g_main_engine->GetReconstructionEngine()->tsdf_map->GetData());
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBegin(GL_QUADS); {
-      glTexCoord2f(0, 0); glVertex2f(g_win_width / 3, g_win_height / 3 * 2);  /* top-left */
-      glTexCoord2f(1, 0); glVertex2f(g_win_width, g_win_height / 3 * 2);      /* top-right */
-      glTexCoord2f(1, 1); glVertex2f(g_win_width, 0);                         /* bottom-right */
-      glTexCoord2f(0, 1); glVertex2f(g_win_width / 3, 0);                     /* bottom-left */
+      glTexCoord2f(0, 0); glVertex3f(g_win_width / 3, g_win_height / 3 * 2, -100);  /* top-left */
+      glTexCoord2f(1, 0); glVertex3f(g_win_width, g_win_height / 3 * 2, -100);      /* top-right */
+      glTexCoord2f(1, 1); glVertex3f(g_win_width, 0, -100);                         /* bottom-right */
+      glTexCoord2f(0, 1); glVertex3f(g_win_width / 3, 0, -100);                     /* bottom-left */
+    } glEnd();
+    
+    glBindTexture(GL_TEXTURE_2D, textures[3]);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE,
+                 g_main_engine->view_size().x, g_main_engine->view_size().y,
+                 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, g_main_engine->GetRenderingEngine()->tsdf_map->GetData());
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBegin(GL_QUADS); {
+      glTexCoord2f(0, 0); glVertex3f(g_win_width, g_win_height / 3 * 2, -100);                        /* top-left */
+      glTexCoord2f(1, 0); glVertex3f(g_win_width + g_win_width / 3 * 2, g_win_height / 3 * 2, -100);  /* top-right */
+      glTexCoord2f(1, 1); glVertex3f(g_win_width + g_win_width / 3 * 2, 0, -100);                     /* bottom-right */
+      glTexCoord2f(0, 1); glVertex3f(g_win_width, 0, -100);                                           /* bottom-left */
     } glEnd();
     
     /* Display view pyramid */
@@ -182,64 +189,47 @@ void DisplayFunc() {
         ImageMono8u level(view_size_x * view_size_y, MEM_CPU);
         ConvertDepthsToGreyscales(*g_view_pyramid->LevelAt(i)->depth_map, &level);
         
-        glBindTexture(GL_TEXTURE_2D, textures[3 + i]);
+        glBindTexture(GL_TEXTURE_2D, textures[4 + i]);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, view_size_x, view_size_y,
                      0, GL_LUMINANCE, GL_UNSIGNED_BYTE, level.GetData());
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glBegin(GL_QUADS); {
-          glTexCoord2f(0, 0); glVertex2f(anchor, 0);                                    /* top-left */
-          glTexCoord2f(1, 0); glVertex2f(anchor + g_win_width / 3, 0);                  /* top-right */
-          glTexCoord2f(1, 1); glVertex2f(anchor + g_win_width / 3, -g_win_height / 3);  /* bottom-right */
-          glTexCoord2f(0, 1); glVertex2f(anchor, -g_win_height / 3);                    /* bottom-left */
+          glTexCoord2f(0, 0); glVertex3f(anchor, 0, -100);                                    /* top-left */
+          glTexCoord2f(1, 0); glVertex3f(anchor + g_win_width / 3, 0, -100);                  /* top-right */
+          glTexCoord2f(1, 1); glVertex3f(anchor + g_win_width / 3, -g_win_height / 3, -100);  /* bottom-right */
+          glTexCoord2f(0, 1); glVertex3f(anchor, -g_win_height / 3, -100);                    /* bottom-left */
         } glEnd();
         anchor += g_win_width / 3;
       }
     }
     
-    /* Display ray length range */
-  //glBindTexture(GL_TEXTURE_2D, textures[6]);
-  //glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE,
-  //             g_main_engine->view_size().x, g_main_engine->view_size().y,
-  //             0, GL_LUMINANCE, GL_UNSIGNED_BYTE, g_main_engine->GetReconstructionEngine()->tsdf_map->GetData());
-  //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  //glBegin(GL_QUADS); {
-  //  glTexCoord2f(0, 0); glVertex2f(g_win_width, g_win_height / 3 * 2);                    /* top-left */
-  //  glTexCoord2f(1, 0); glVertex2f(g_win_width + g_win_width / 3, g_win_height / 3 * 2);  /* top-right */
-  //  glTexCoord2f(1, 1); glVertex2f(g_win_width + g_win_width / 3, g_win_height / 3);      /* bottom-right */
-  //  glTexCoord2f(0, 1); glVertex2f(g_win_width, g_win_height / 3);                        /* bottom-left */
-  //} glEnd();
-  //glBindTexture(GL_TEXTURE_2D, textures[7]);
-  //glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE,
-  //             g_main_engine->view_size().x, g_main_engine->view_size().y,
-  //             0, GL_LUMINANCE, GL_UNSIGNED_BYTE, g_main_engine->GetRenderingEngine()->tsdf_map->GetData());
-  //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  //glBegin(GL_QUADS); {
-  ////glTexCoord2f(0, 0); glVertex2f(g_win_width, g_win_height / 3);                    /* top-left */
-  ////glTexCoord2f(1, 0); glVertex2f(g_win_width + g_win_width / 3, g_win_height / 3);  /* top-right */
-  ////glTexCoord2f(1, 1); glVertex2f(g_win_width + g_win_width / 3, 0);                 /* bottom-right */
-  ////glTexCoord2f(0, 1); glVertex2f(g_win_width, 0);                                   /* bottom-left */
-  //  glTexCoord2f(0, 0); glVertex2f(g_win_width, g_win_height / 3 * 2);                        /* top-left */
-  //  glTexCoord2f(1, 0); glVertex2f(g_win_width + g_win_width / 3 * 2, g_win_height / 3 * 2);  /* top-right */
-  //  glTexCoord2f(1, 1); glVertex2f(g_win_width + g_win_width / 3 * 2, 0);                     /* bottom-right */
-  //  glTexCoord2f(0, 1); glVertex2f(g_win_width, 0);                                           /* bottom-left */
-  //} glEnd();
-    
     /* Display point cloud */
-  //glBindTexture(GL_TEXTURE_2D, textures[8]);
-  //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_main_engine->view_size().x, g_main_engine->view_size().y,
-  //             0, GL_RGBA, GL_UNSIGNED_BYTE, g_pcl_image->GetData());
-  //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  //glBegin(GL_QUADS); {
-  //  glTexCoord2f(0, 0); glVertex2f(g_win_width, 0);                                    /* top-left */
-  //  glTexCoord2f(1, 0); glVertex2f(g_win_width + g_win_width / 3, 0);                  /* top-right */
-  //  glTexCoord2f(1, 1); glVertex2f(g_win_width + g_win_width / 3, -g_win_height / 3);  /* bottom-right */
-  //  glTexCoord2f(0, 1); glVertex2f(g_win_width, -g_win_height / 3);                    /* bottom-left */
-  //} glEnd();
+    glBindTexture(GL_TEXTURE_2D, textures[7]);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_main_engine->view_size().x, g_main_engine->view_size().y,
+                 0, GL_RGBA, GL_UNSIGNED_BYTE, g_pcl_image->GetData());
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBegin(GL_QUADS); {
+      glTexCoord2f(0, 0); glVertex3f(g_win_width, 0, -100);                                    /* top-left */
+      glTexCoord2f(1, 0); glVertex3f(g_win_width + g_win_width / 3, 0, -100);                  /* top-right */
+      glTexCoord2f(1, 1); glVertex3f(g_win_width + g_win_width / 3, -g_win_height / 3, -100);  /* bottom-right */
+      glTexCoord2f(0, 1); glVertex3f(g_win_width, -g_win_height / 3, -100);                    /* bottom-left */
+    } glEnd();
   } glPopMatrix();
+  glDisable(GL_TEXTURE_2D);
+
+  //  glPushMatrix(); {
+  //    glColor3f(1, 1, 1);
+  //    glTranslatef(g_win_width + g_win_width / 3 + 100, -100, -50);
+  //    glRotatef(180, 1, 0, 0);
+  //    glTranslatef(g_translate_x, g_translate_y, g_translate_z);
+  //    glRotatef(g_rotate_angle_h, 0, 1, 0);
+  //    glRotatef(g_rotate_angle_v, 1, 0, 0);
+  //    glutWireTeapot(-50 * g_scale);
+  //    glColor3f(1, 1, 1);
+  //  }; glPopMatrix();
+
 
   glutSwapBuffers();
 }
@@ -312,6 +302,10 @@ void MouseMotionFunc(int x, int y) {
   if (g_left_pressed) {
     g_rotate_angle_h += x - g_mouse_x;
     g_rotate_angle_v -= y - g_mouse_y;
+    while (g_rotate_angle_h >= 360) g_rotate_angle_h -= 360;
+    while (g_rotate_angle_v >= 360) g_rotate_angle_v -= 360;
+    while (g_rotate_angle_h < 0) g_rotate_angle_h += 360;
+    while (g_rotate_angle_v < 0) g_rotate_angle_v += 360;
     g_mouse_x = x;
     g_mouse_y = y;
   }
@@ -319,16 +313,11 @@ void MouseMotionFunc(int x, int y) {
   if (g_right_pressed) {
     g_translate_x += x - g_mouse_x;
     g_translate_y += y - g_mouse_y;
-    while (g_translate_x >= 360) g_translate_x -= 360;
-    while (g_translate_y >= 360) g_translate_y -= 360;
-    while (g_translate_x < 0) g_translate_x += 360;
-    while (g_translate_y < 0) g_translate_y += 360;
     g_mouse_x = x;
     g_mouse_y = y;
   }
 
   if (g_middle_pressed) {
-    g_translate_z += y - g_mouse_y;
     g_scale += (x - g_mouse_x) / 20.0;
     if (g_scale < 0.1) g_scale = 0.1;
     if (g_scale > 5.0) g_scale = 5.0;
@@ -364,8 +353,8 @@ int main(int argc, char* argv[]) {
   const char* rgb_file = argv[2];
   const char* grey_file = argv[3];
   g_main_engine = new MainEngine(calib_file, rgb_file, grey_file);
-  g_win_width = g_main_engine->view_size().x * 1.8;
-  g_win_height = g_main_engine->view_size().y * 1.8;
+  g_win_width = g_main_engine->view_size().x * 1.5;
+  g_win_height = g_main_engine->view_size().y * 1.5;
   g_greyscale_image = new ImageMono8u(g_main_engine->view_size().x * g_main_engine->view_size().y, MEM_CPU);
   g_pcl_image = new ImageRGBA8u(g_main_engine->view_size().x * g_main_engine->view_size().y, MEM_CPU);
   g_ray_length_min = new ImageMono8u(g_main_engine->GetRenderingEngine()->range_resolution()->x *
@@ -382,9 +371,8 @@ int main(int argc, char* argv[]) {
   glLoadIdentity();
   glOrtho(0, g_win_width + g_win_width / 3 * 2, -g_win_height / 3, g_win_height / 3 * 2, 0, 1000);
 
-  glEnable(GL_DEPTH_TEST);
-  glEnable(GL_TEXTURE_2D);
   glGenTextures(texture_n, textures);
+  glGenBuffers(1, &g_pcl_vbo);
 
   glutKeyboardFunc(KeyboardFunc);
   glutSpecialFunc(SpecialKeyFunc);

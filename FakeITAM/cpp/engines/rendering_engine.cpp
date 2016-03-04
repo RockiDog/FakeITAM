@@ -69,7 +69,7 @@ void RenderingEngine::FullRenderIcpMaps(const Scene& scene_in,
     pcl_out->set_camera_pose(pose_in);
   }
 
-  //LOG->WriteLine()->WriteLine(E, cnt);
+  LOG->WriteLine()->WriteLine(E, cnt);
 }
 
 /* TODO Test */
@@ -313,13 +313,14 @@ void RenderingEngine::CastRay(const Scene& scene_in,
   float tsdf = 1;
   while (length < total_length) {
     float step_length;
-    if (ReadNearestTsdf(scene_in, point, &tsdf, intrinsics_in) == false) {
+    if (false && ReadNearestTsdf(scene_in, point, &tsdf, intrinsics_in) == false) {
       /* Jump by block size */
       step_length = gVoxelBlockSizeL * gVoxelMetricSize;
     } else {
+      ReadInterpolatedTsdf(scene_in, point, &tsdf);
       if (tsdf <= gRaycastSmallTsdfMax && tsdf >= gRaycastSmallTsdfMin) {
         /* Small T-SDF, read interpolated T-SDF */
-        ReadInterpolatedTsdf(scene_in, point, &tsdf);
+        //ReadInterpolatedTsdf(scene_in, point, &tsdf);
         if (tsdf <= 0)
           /* Found zero level of T-SDF */
           break;
@@ -439,19 +440,20 @@ bool RenderingEngine::ReadNearestTsdf(const Scene& scene_in,
   int offset = offset_z * gVoxelBlockSizeQ + offset_y * gVoxelBlockSizeL + offset_x;
   if (voxel_block[offset].weight <= 0) {
     *tsdf_out = 1;
+    /* Debug info */ {
+      static float fx = intrinsics_in.x;
+      static float fy = intrinsics_in.y;
+      static float cx = intrinsics_in.z;
+      static float cy = intrinsics_in.w;
+      float xx = point_in.x / point_in.z * fx + cx;
+      float yy = point_in.y / point_in.z * fy + cy;
+      float tsdf = ReconstructionEngine::ShortToFloat(voxel_block[offset].sdf);
+      if (255 - fabs(tsdf) * 255 > (*tsdf_map)[xx + yy * 640])
+        (*tsdf_map)[xx + yy * 640] = 255 - (fabs(tsdf) <= 1 ? fabs(tsdf) * 255 : 255);
+      ++cnt;
+    }
     return false;  /* Invalid */
   }
-  ///* Debug info */ {
-  //  static float fx = intrinsics_in.x;
-  //  static float fy = intrinsics_in.y;
-  //  static float cx = intrinsics_in.z;
-  //  static float cy = intrinsics_in.w;
-  //  float xx = point_in.x / point_in.z * fx + cx;
-  //  float yy = point_in.y / point_in.z * fy + cy;
-  //  float tsdf = ReconstructionEngine::ShortToFloat(voxel_block[offset].sdf);
-  //  if (255 - fabs(tsdf) * 255 > (*tsdf_map)[xx + yy * 640])
-  //    (*tsdf_map)[xx + yy * 640] = 255 - (fabs(tsdf) <= 1 ? fabs(tsdf) * 255 : 255);
-  //}
   *tsdf_out = ReconstructionEngine::ShortToFloat(voxel_block[offset].sdf);
   return true;
 }

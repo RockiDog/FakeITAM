@@ -26,6 +26,7 @@ using namespace fakeitam::utility;
 ReconstructionEngine::ReconstructionEngine() {
   voxel_block_cache_ = new MemBlock<Vector3i>(gBlockHashMapSize, MEM_CPU);
   tsdf_map = new ImageMono8u(640 * 480, MEM_CPU);
+  pcl = new utility::MemBlock<utility::Vector3f>(100 * 640 * 480, MEM_CPU);
 }
 
 ReconstructionEngine::~ReconstructionEngine() {
@@ -33,7 +34,9 @@ ReconstructionEngine::~ReconstructionEngine() {
   voxel_block_cache_ = nullptr;
 
   delete tsdf_map;
+  delete pcl;
   tsdf_map = nullptr;
+  pcl = nullptr;
 }
 
 /* TODO Tired, implement later */
@@ -222,9 +225,9 @@ void ReconstructionEngine::IntegrateVoxelsToWorldScene(const View& view_in,
     int visible_id = *it;
     BlockHashEntry entry = hash_list[visible_id];
     const Vector3i& corner = entry.position;
-    for (int x = 0; x < gVoxelBlockSizeL; ++x) {
-      for (int y = 0; y < gVoxelBlockSizeL; ++y) {
-        for (int z = 0; z < gVoxelBlockSizeL; ++z) {
+    for (int z = 0; z < gVoxelBlockSizeL; ++z) {
+      for (int x = 0; x < gVoxelBlockSizeL; ++x) {
+        for (int y = 0; y < gVoxelBlockSizeL; ++y) {
           int id = x + y * gVoxelBlockSizeL + z * gVoxelBlockSizeQ;
           Voxel& voxel = local_voxel_array[id];
           Vector3i voxel_g;
@@ -308,7 +311,7 @@ void ReconstructionEngine::UpdateVoxelTsdfAndWeight(const Vector2i& view_size_in
   float fx = intrinsics_in(0, 0), fy = intrinsics_in(1, 1);
   float dx = intrinsics_in(0, 2), dy = intrinsics_in(1, 2);
   float lambda = Vector3f((pixel.x - dx)/fx, (pixel.y - dy)/fy, 1).GetNorm();
-  float eta = depth - (camera_coordinates_in - point_g_in.ProjectTo3d()).GetNorm() / lambda;
+  float eta = (camera_coordinates_in - point_g_in.ProjectTo3d()).GetNorm() / lambda - depth;
   if (eta <= -mu)
     return;
 
@@ -320,10 +323,11 @@ void ReconstructionEngine::UpdateVoxelTsdfAndWeight(const Vector2i& view_size_in
   int new_W = 1;
 
   float new_tsdf = (old_F * old_W + new_F * new_W) / (old_W + new_W);
-  //new_tsdf = 0;
   voxel_out->sdf = FloatToShort(new_tsdf);
   voxel_out->weight = (old_W + new_W) > max_W ? max_W : (old_W + new_W);
   if (255 - fabs(new_tsdf) * 255 > (*tsdf_map)[pixel.x + pixel.y * view_size_in.x])
     (*tsdf_map)[pixel.x + pixel.y * view_size_in.x] = 255 - (fabs(new_tsdf) <= 1 ? fabs(new_tsdf) * 255 : 255);
   ++cnt;
+  static int i = 0;
+  if (point_g_in.w > 0) (*pcl)[i++] = point_g_in.ProjectTo3d();
 }
