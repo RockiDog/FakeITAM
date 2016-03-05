@@ -27,6 +27,9 @@ class ReconstructionEngine {
 
   ImageMono8u* tsdf_map;
   utility::MemBlock<utility::Vector3f>* pcl;
+  int pcl_cnt;
+  utility::MemBlock<utility::Vector3f>* pcl2;
+  int pcl_cnt2;
 
   virtual void ResetWorldScene(Scene* scene_out);
   virtual void AllocateWorldSceneFromView(const View& view_in,

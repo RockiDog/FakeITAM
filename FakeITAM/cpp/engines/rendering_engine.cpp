@@ -33,6 +33,10 @@ RenderingEngine::RenderingEngine(Vector2i view_size) {
                                    ceil(view_size.y * 1.0 / gBoundBoxSubsample));
   ray_length_range_ = new MemBlock<Vector2f>(range_resolution_->x * range_resolution_->y, MEM_CPU);
   tsdf_map = new ImageMono8u(640 * 480, MEM_CPU);
+  pcl = new utility::MemBlock<utility::Vector3f>(200 * 640 * 480, MEM_CPU);
+  pcl_cnt = 0;
+  pcl2 = new utility::MemBlock<utility::Vector3f>(200 * 640 * 480, MEM_CPU);
+  pcl_cnt2 = 0;
 }
 
 RenderingEngine::~RenderingEngine() {
@@ -42,7 +46,10 @@ RenderingEngine::~RenderingEngine() {
   ray_length_range_ = nullptr;
 
   delete tsdf_map;
+  delete pcl;
+  delete pcl2;
   tsdf_map = nullptr;
+  pcl2 = nullptr;
 }
 
 /* TODO Test */
@@ -305,6 +312,8 @@ void RenderingEngine::CastRay(const Scene& scene_in,
                                     int x, int y,
                                     Vector4f* point_out,
                               const Vector4f& intrinsics_in) {
+  (*pcl)[pcl_cnt++] = start_g_in.ProjectTo3d() / gVoxelMetricSize;
+  //(*pcl2)[pcl_cnt2++] = end_g_in.ProjectTo3d() / gVoxelMetricSize;
   float total_length = (end_g_in - start_g_in).GetNorm();
   float length = 0;
   Vector3f point {start_g_in.x, start_g_in.y, start_g_in.z};
@@ -313,14 +322,13 @@ void RenderingEngine::CastRay(const Scene& scene_in,
   float tsdf = 1;
   while (length < total_length) {
     float step_length;
-    if (false && ReadNearestTsdf(scene_in, point, &tsdf, intrinsics_in) == false) {
+    if (ReadNearestTsdf(scene_in, point, &tsdf, intrinsics_in) == false) {
       /* Jump by block size */
       step_length = gVoxelBlockSizeL * gVoxelMetricSize;
     } else {
-      ReadInterpolatedTsdf(scene_in, point, &tsdf);
       if (tsdf <= gRaycastSmallTsdfMax && tsdf >= gRaycastSmallTsdfMin) {
         /* Small T-SDF, read interpolated T-SDF */
-        //ReadInterpolatedTsdf(scene_in, point, &tsdf);
+        ReadInterpolatedTsdf(scene_in, point, &tsdf);
         if (tsdf <= 0)
           /* Found zero level of T-SDF */
           break;
@@ -450,7 +458,6 @@ bool RenderingEngine::ReadNearestTsdf(const Scene& scene_in,
       float tsdf = ReconstructionEngine::ShortToFloat(voxel_block[offset].sdf);
       if (255 - fabs(tsdf) * 255 > (*tsdf_map)[xx + yy * 640])
         (*tsdf_map)[xx + yy * 640] = 255 - (fabs(tsdf) <= 1 ? fabs(tsdf) * 255 : 255);
-      ++cnt;
     }
     return false;  /* Invalid */
   }

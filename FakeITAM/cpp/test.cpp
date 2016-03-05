@@ -6,17 +6,15 @@
 //  Copyright © 2015年 Soap. All rights reserved.
 //
 
-
-#ifndef GL_GLEXT_PROTOTYPES
-#define GL_GLEXT_PROTOTYPES
-#endif
-
 #ifdef __APPLE__
 #include <OpenGL/gl.h>
 #include <OpenGL/glu.h>
 #include <GLUT/glut.h>
 
 #elif __linux__
+#ifndef GL_GLEXT_PROTOTYPES
+#define GL_GLEXT_PROTOTYPES
+#endif
 #include <GL/gl.h>
 #include <GL/glext.h>
 #include <GL/glu.h>
@@ -49,7 +47,9 @@ MainEngine* g_main_engine = nullptr;
 const ImageRGB8u* g_rgb_image = nullptr;
 const ImageMono32f* g_depth_image = nullptr;
 const ViewPyramid* g_view_pyramid = nullptr;
-GLuint g_pcl_vbo;
+const GLsizei vbo_n = 3;
+GLuint pcl_vbos[vbo_n];
+GLuint color_vbos[vbo_n];
 
 ImageMono8u* g_greyscale_image = nullptr;
 ImageRGBA8u* g_pcl_image = nullptr;
@@ -219,34 +219,97 @@ void DisplayFunc() {
   } glPopMatrix();
   glDisable(GL_TEXTURE_2D);
 
-  //  glPushMatrix(); {
-  //    glColor3f(1, 1, 1);
-  //    glTranslatef(g_win_width + g_win_width / 3 + 100, -100, -50);
-  //    glRotatef(180, 1, 0, 0);
-  //    glTranslatef(g_translate_x, g_translate_y, g_translate_z);
-  //    glRotatef(g_rotate_angle_h, 0, 1, 0);
-  //    glRotatef(g_rotate_angle_v, 1, 0, 0);
-  //    glutWireTeapot(-50 * g_scale);
-  //    glColor3f(1, 1, 1);
-  //  }; glPopMatrix();
+  glutSwapBuffers();
+}
 
+void DisplayFunc2() {
+  if (g_rgb_image == nullptr)
+    return;
+
+  /* Do the actual drawing */
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity();
+
+  glPushMatrix(); {
+    glRotatef(180, 1, 0, 0);
+    glTranslatef(g_translate_x + 800, g_translate_y, g_translate_z + 500);
+    glRotatef(g_rotate_angle_h - 90, 0, 1, 0);
+    glRotatef(g_rotate_angle_v, 1, 0, 0);
+    glScalef(g_scale, g_scale, g_scale);
+    
+    glColor3f(1, 1, 1);
+    glutWireSphere(0.5, 20, 20);
+    
+    //glPointSize(3);
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_COLOR_ARRAY);
+    glBindBuffer(GL_ARRAY_BUFFER, pcl_vbos[0]);
+    glVertexPointer(3, GL_FLOAT, 0, nullptr);
+    glBufferData(GL_ARRAY_BUFFER,
+                 sizeof(float) * 3 * g_main_engine->GetReconstructionEngine()->pcl_cnt,
+                 g_main_engine->GetReconstructionEngine()->pcl->GetData(),
+                 GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, color_vbos[0]);
+    glColorPointer(3, GL_FLOAT, 0, nullptr);
+    glBufferData(GL_ARRAY_BUFFER,
+                 sizeof(float) * 3 * g_main_engine->GetReconstructionEngine()->pcl_cnt2,
+                 g_main_engine->GetReconstructionEngine()->pcl2->GetData(),
+                 GL_STATIC_DRAW);
+    glDrawArrays(GL_POINTS, 0, g_main_engine->GetReconstructionEngine()->pcl_cnt2);
+    glDisableClientState(GL_COLOR_ARRAY);
+    
+    glColor3f(0, 0.8, 0);
+    glBindBuffer(GL_ARRAY_BUFFER, pcl_vbos[1]);
+    glVertexPointer(3, GL_FLOAT, 0, nullptr);
+    glBufferData(GL_ARRAY_BUFFER,
+                 sizeof(float) * 3 * g_main_engine->GetRenderingEngine()->pcl_cnt,
+                 g_main_engine->GetRenderingEngine()->pcl->GetData(),
+                 GL_STATIC_DRAW);
+    glDrawArrays(GL_POINTS, 0, g_main_engine->GetReconstructionEngine()->pcl_cnt);
+    
+    glColor3f(0, 0, 0.8);
+    glBindBuffer(GL_ARRAY_BUFFER, pcl_vbos[2]);
+    glVertexPointer(3, GL_FLOAT, 0, nullptr);
+    glBufferData(GL_ARRAY_BUFFER,
+                 sizeof(float) * 3 * g_main_engine->GetRenderingEngine()->pcl_cnt2,
+                 g_main_engine->GetRenderingEngine()->pcl2->GetData(),
+                 GL_STATIC_DRAW);
+    glDrawArrays(GL_POINTS, 0, g_main_engine->GetRenderingEngine()->pcl_cnt2);
+    glDisableClientState(GL_VERTEX_ARRAY);
+  }; glPopMatrix();
+
+  glPushMatrix(); {
+    glColor3f(1, 1, 1);
+    glTranslatef(10 + g_scale / 2,
+                 -g_win_height / 3 + 10 + g_scale / 2,
+                 -(10 + g_scale / 2));
+    glScalef(g_scale, g_scale, g_scale);
+    glutSolidCube(1);
+  } glPushMatrix();
 
   glutSwapBuffers();
 }
 
 void KeyboardFunc(unsigned char key, int x, int y) {
   switch (key) {
-    case 'n' : { g_stalled = false; g_auto = false; } break;
-    case 'N' : { g_stalled = false; g_auto = false; } break;
+    case 'n' :
+    case 'N' :
     case 13  : { g_stalled = false; g_auto = false; } break;
-    case 'a' : { g_auto ^= 1; } break;
+    case 'a' :
     case 'A' : { g_auto ^= 1; } break;
-    case 'q' : { exit(0); } break;
-    case 'Q' : { exit(0); } break;
+    case 'q' :
+    case 'Q' :
     case 27  : { exit(0); } break;
     
-    case 'r' : { g_auto_rotate ^= 1; } break;
+    case 'r' :
     case 'R' : { g_auto_rotate ^= 1; } break;
+    case 'o' :
+    case 'O' : {
+      g_rotate_angle_h = g_rotate_angle_v = 0;
+      g_translate_x = g_translate_y = g_translate_z = 0;
+      g_scale = 1;
+    } break;
   }
 }
 
@@ -288,20 +351,25 @@ void MouseFunc(int button,int state,int x,int y) {
       }
     } break;
     case GLUT_MIDDLE_BUTTON : {
-      if (g_middle_released) {
-        g_mouse_x = x;
-        g_mouse_y = y;
+      if (state == GLUT_DOWN) {
+        if (g_middle_released) {
+          g_mouse_x = x;
+          g_mouse_y = y;
+        }
+        g_middle_pressed = true;
+        g_middle_released = false;
+      } else if (state == GLUT_UP) {
+        g_middle_pressed = false;
+        g_middle_released = true;
       }
-      g_middle_pressed = true;
-      g_middle_released = false;
     } break;
   }
 }
 
 void MouseMotionFunc(int x, int y) {
   if (g_left_pressed) {
-    g_rotate_angle_h += x - g_mouse_x;
-    g_rotate_angle_v -= y - g_mouse_y;
+    g_rotate_angle_h += (x - g_mouse_x) / 10.0;
+    g_rotate_angle_v -= (y - g_mouse_y) / 10.0;
     while (g_rotate_angle_h >= 360) g_rotate_angle_h -= 360;
     while (g_rotate_angle_v >= 360) g_rotate_angle_v -= 360;
     while (g_rotate_angle_h < 0) g_rotate_angle_h += 360;
@@ -318,9 +386,9 @@ void MouseMotionFunc(int x, int y) {
   }
 
   if (g_middle_pressed) {
-    g_scale += (x - g_mouse_x) / 20.0;
-    if (g_scale < 0.1) g_scale = 0.1;
-    if (g_scale > 5.0) g_scale = 5.0;
+    g_scale += (x - g_mouse_x) / 100.0;
+    if (g_scale < 0.5) g_scale = 0.5;
+    //if (g_scale > 5.0) g_scale = 5.0;
     g_mouse_x = x;
     g_mouse_y = y;
   }
@@ -328,7 +396,7 @@ void MouseMotionFunc(int x, int y) {
 
 void IdleFunc() {
   if (g_auto_rotate && g_left_released)
-    g_rotate_angle_h = g_rotate_angle_h == 360 ? 1 : g_rotate_angle_h + 1;
+    g_rotate_angle_h = g_rotate_angle_h == 0 ? 359 : g_rotate_angle_h - 1;
 
   if (g_stalled == false || g_auto == true) {
     g_main_engine->ProcessOneFrame();
@@ -363,22 +431,25 @@ int main(int argc, char* argv[]) {
                                      g_main_engine->GetRenderingEngine()->range_resolution()->y, MEM_CPU);
 
   glutInit(&argc, argv);
-  glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
+  glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
 
   glutInitWindowSize(g_win_width + g_win_width / 3 * 2, g_win_height);
   glutCreateWindow("Test Window");
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
-  glOrtho(0, g_win_width + g_win_width / 3 * 2, -g_win_height / 3, g_win_height / 3 * 2, 0, 1000);
+  glOrtho(0, g_win_width + g_win_width / 3 * 2, -g_win_height / 3, g_win_height / 3 * 2, 0, 10000);
 
+  glEnable(GL_DEPTH_TEST);
+  glEnable(GL_POINT_SMOOTH);
   glGenTextures(texture_n, textures);
-  glGenBuffers(1, &g_pcl_vbo);
+  glGenBuffers(vbo_n, pcl_vbos);
+  glGenBuffers(vbo_n, color_vbos);
 
   glutKeyboardFunc(KeyboardFunc);
   glutSpecialFunc(SpecialKeyFunc);
   glutMouseFunc(MouseFunc);
   glutMotionFunc(MouseMotionFunc);
-  glutDisplayFunc(DisplayFunc);
+  glutDisplayFunc(DisplayFunc2);
   glutIdleFunc(IdleFunc);
   try {
     glutMainLoop();

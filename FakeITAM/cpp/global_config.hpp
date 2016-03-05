@@ -50,7 +50,7 @@ const int gBlockHashOrderedArraySize = 0x100000;
 const int gBlockHashExcessListSize   =  0x20000;
 const int gBlockHashLocalNum         =  0x40000;
 
-const float gVoxelMetricSize = 0.001;  /* in meter */
+const float gVoxelMetricSize = 0.005;  /* in meter */
 const int gVoxelBlockSizeL =   8;      /* linear */
 const int gVoxelBlockSizeQ =  64;      /* quadric */
 const int gVoxelBlockSizeC = 512;      /* cubic */
@@ -61,7 +61,7 @@ const float gRaycastSmallTsdfMin = -0.5;
 const float gRaycastSmallTsdfMax = 0.1;
 const int gBoundBoxFragmentSizeL = 16;  /* linear */
 const int gBoundBoxMaxFragmentNum = 65536 << 2;
-const int gBoundBoxSubsample = 1;
+const int gBoundBoxSubsample = 8;
 
 const int gRenderMaxPointCloudAge = 5;
 const float gRenderMaxCameraDistance2 = 0.0005;  /* in meter^2 */

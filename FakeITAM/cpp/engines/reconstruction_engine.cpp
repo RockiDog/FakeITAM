@@ -25,8 +25,11 @@ using namespace fakeitam::utility;
 
 ReconstructionEngine::ReconstructionEngine() {
   voxel_block_cache_ = new MemBlock<Vector3i>(gBlockHashMapSize, MEM_CPU);
-  tsdf_map = new ImageMono8u(640 * 480, MEM_CPU);
+  tsdf_map = new ImageMono8u(100 * 640 * 480, MEM_CPU);
   pcl = new utility::MemBlock<utility::Vector3f>(100 * 640 * 480, MEM_CPU);
+  pcl_cnt = 0;
+  pcl2 = new utility::MemBlock<utility::Vector3f>(100 * 640 * 480, MEM_CPU);
+  pcl_cnt2 = 0;
 }
 
 ReconstructionEngine::~ReconstructionEngine() {
@@ -35,8 +38,10 @@ ReconstructionEngine::~ReconstructionEngine() {
 
   delete tsdf_map;
   delete pcl;
+  delete pcl2;
   tsdf_map = nullptr;
   pcl = nullptr;
+  pcl2 = nullptr;
 }
 
 /* TODO Tired, implement later */
@@ -305,7 +310,7 @@ void ReconstructionEngine::UpdateVoxelTsdfAndWeight(const Vector2i& view_size_in
     return;
 
   float depth = depth_in[pixel.x + pixel.y * view_size_in.x];
-  if (depth < 0)
+  if (depth <= 0)
     return;
 
   float fx = intrinsics_in(0, 0), fy = intrinsics_in(1, 1);
@@ -325,9 +330,12 @@ void ReconstructionEngine::UpdateVoxelTsdfAndWeight(const Vector2i& view_size_in
   float new_tsdf = (old_F * old_W + new_F * new_W) / (old_W + new_W);
   voxel_out->sdf = FloatToShort(new_tsdf);
   voxel_out->weight = (old_W + new_W) > max_W ? max_W : (old_W + new_W);
-  if (255 - fabs(new_tsdf) * 255 > (*tsdf_map)[pixel.x + pixel.y * view_size_in.x])
-    (*tsdf_map)[pixel.x + pixel.y * view_size_in.x] = 255 - (fabs(new_tsdf) <= 1 ? fabs(new_tsdf) * 255 : 255);
-  ++cnt;
-  static int i = 0;
-  if (point_g_in.w > 0) (*pcl)[i++] = point_g_in.ProjectTo3d();
+  //if (255 - fabs(new_tsdf) * 255 > (*tsdf_map)[pixel.x + pixel.y * view_size_in.x])
+  //  (*tsdf_map)[pixel.x + pixel.y * view_size_in.x] = 255 - (fabs(new_tsdf) <= 1 ? fabs(new_tsdf) * 255 : 255);
+  if (point_g_in.w > 0) {
+    (*pcl)[pcl_cnt++] = point_g_in.ProjectTo3d() / gVoxelMetricSize;
+    (*pcl2)[pcl_cnt2].x = 1 - (fabs(new_tsdf) <= 1 ? fabs(new_tsdf) : 1);
+    (*pcl2)[pcl_cnt2].y = 1 - (fabs(new_tsdf) <= 1 ? fabs(new_tsdf) : 1);
+    (*pcl2)[pcl_cnt2++].z = 1 - (fabs(new_tsdf) <= 1 ? fabs(new_tsdf) : 1);
+  }
 }
