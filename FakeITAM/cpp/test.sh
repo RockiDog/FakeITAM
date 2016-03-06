@@ -28,12 +28,19 @@ if [ ! $build_type ]; then
   else
     build_type="Debug"
   fi
+elif [ ${build_type:0:1} = "M" ] || [ ${build_type:0:1} = "m" ]; then
+  if [ -f Test ]; then
+    build_type="Release"
+  elif [ -f Test_d ]; then
+    build_type="Debug"
+  else
+    build_type="Debug"
+  fi
+  run=false
 elif [ ${build_type:0:1} = "R" ] || [ ${build_type:0:1} = "r" ]; then
   build_type="Release"
 elif [ ${build_type:0:1} = "D" ] || [ ${build_type:0:1} = "d" ]; then
   build_type="Debug"
-elif [ ${build_type:0:1} = "M" ] || [ ${build_type:0:1} = "m" ]; then
-  run=false
 fi
 
 bin_name=""
@@ -62,15 +69,16 @@ fi
 
 echo -e "${HIL}make -j 8 -C ../build/${END}"
 make -j 8 -C ../build/
-if [ $bin_name != "Test" ]; then
+if [ ! $bin_name = "Test" ]; then
   mv Test $bin_name
 fi
 echo
 
-echo -e "${HIL}Press <Enter> to run ${bin_name}${END}"
-read
-
-echo -e "${HIL}./${bin_name} ~/Desktop/Teddy/calib.txt ~/Desktop/Teddy/Frames/%04i.ppm ~/Desktop/Teddy/Frames/%04i.pgm${END}"
-./${bin_name} ~/Desktop/Teddy/calib.txt ~/Desktop/Teddy/Frames/%04i.ppm ~/Desktop/Teddy/Frames/%04i.pgm
+if [ $run = true ]; then
+  echo -e "${HIL}Press <Enter> to run ${bin_name}${END}"
+  read
+  echo -e "${HIL}./${bin_name} ~/Desktop/Teddy/calib.txt ~/Desktop/Teddy/Frames/%04i.ppm ~/Desktop/Teddy/Frames/%04i.pgm${END}"
+  ./${bin_name} ~/Desktop/Teddy/calib.txt ~/Desktop/Teddy/Frames/%04i.ppm ~/Desktop/Teddy/Frames/%04i.pgm
+fi
 
 echo -e "\033[32;1;4m==> Exit\n\033[0m"

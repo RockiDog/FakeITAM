@@ -262,6 +262,8 @@ void RenderingEngine::FullRaycast(
       end_g.z = range.y;
       end_g.w = 1;
       end_g = Tg_in * end_g;
+      (*pcl)[pcl_cnt++] = start_g.ProjectTo3d() / gVoxelMetricSize;
+      (*pcl2)[pcl_cnt2++] = end_g.ProjectTo3d() / gVoxelMetricSize;
       Vector4f& intersection = (*points_out)[x + y * view_in.size.x];
       CastRay(scene_in, start_g, end_g, x, y, &intersection, intrinsics);
     }
@@ -312,8 +314,6 @@ void RenderingEngine::CastRay(const Scene& scene_in,
                                     int x, int y,
                                     Vector4f* point_out,
                               const Vector4f& intrinsics_in) {
-  (*pcl)[pcl_cnt++] = start_g_in.ProjectTo3d() / gVoxelMetricSize;
-  //(*pcl2)[pcl_cnt2++] = end_g_in.ProjectTo3d() / gVoxelMetricSize;
   float total_length = (end_g_in - start_g_in).GetNorm();
   float length = 0;
   Vector3f point {start_g_in.x, start_g_in.y, start_g_in.z};
@@ -352,7 +352,7 @@ void RenderingEngine::CastRay(const Scene& scene_in,
     point_out->z = point.z;
     point_out->w = 1;
   } else {
-    *point_out = Vector4f(0, 0, 0, -1);
+    *point_out = Vector4f(0, 0, 0, 0);
   }
 }
 
@@ -431,8 +431,9 @@ bool RenderingEngine::ReadNearestTsdf(const Scene& scene_in,
     if (entry.position.x == block.x &&
         entry.position.y == block.y &&
         entry.position.z == block.z &&
-        entry.offset_in_array >= 0)
+        entry.offset_in_array >= 0) {
       break;  /* Found */
+    }
     if (entry.excess_offset_next > 0) {
       hash = gBlockHashOrderedArraySize + entry.excess_offset_next - 1;
       entry = index[hash];
@@ -441,24 +442,13 @@ bool RenderingEngine::ReadNearestTsdf(const Scene& scene_in,
       return false;  /* Not found */
     }
   }
-  const Voxel* voxel_block = &voxel_array[entry.offset_in_array];
+  const Voxel* voxel_block = &voxel_array[entry.offset_in_array * gVoxelBlockSizeC];
   int offset_x = round(point_in.x / gVoxelMetricSize - entry.position.x * gVoxelBlockSizeL);
   int offset_y = round(point_in.y / gVoxelMetricSize - entry.position.y * gVoxelBlockSizeL);
   int offset_z = round(point_in.z / gVoxelMetricSize - entry.position.z * gVoxelBlockSizeL);
   int offset = offset_z * gVoxelBlockSizeQ + offset_y * gVoxelBlockSizeL + offset_x;
   if (voxel_block[offset].weight <= 0) {
     *tsdf_out = 1;
-    /* Debug info */ {
-      static float fx = intrinsics_in.x;
-      static float fy = intrinsics_in.y;
-      static float cx = intrinsics_in.z;
-      static float cy = intrinsics_in.w;
-      float xx = point_in.x / point_in.z * fx + cx;
-      float yy = point_in.y / point_in.z * fy + cy;
-      float tsdf = ReconstructionEngine::ShortToFloat(voxel_block[offset].sdf);
-      if (255 - fabs(tsdf) * 255 > (*tsdf_map)[xx + yy * 640])
-        (*tsdf_map)[xx + yy * 640] = 255 - (fabs(tsdf) <= 1 ? fabs(tsdf) * 255 : 255);
-    }
     return false;  /* Invalid */
   }
   *tsdf_out = ReconstructionEngine::ShortToFloat(voxel_block[offset].sdf);
@@ -500,7 +490,7 @@ void RenderingEngine::TrilinearInterpolation(const VoxelBlockHashMap& index_in,
           entry.position.y == block.y &&
           entry.position.z == block.z &&
           entry.offset_in_array >= 0) {
-        const Voxel* voxel_block = &src_in[entry.offset_in_array];
+        const Voxel* voxel_block = &src_in[entry.offset_in_array * gVoxelBlockSizeC];
         int offset = (c[i].z - block.z * gVoxelBlockSizeL) * gVoxelBlockSizeQ +
                      (c[i].y - block.y * gVoxelBlockSizeL) * gVoxelBlockSizeL +
                      (c[i].x - block.x * gVoxelBlockSizeL);

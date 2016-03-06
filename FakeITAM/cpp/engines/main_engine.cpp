@@ -127,8 +127,8 @@ void MainEngine::ProcessOneFrame() throw(std::runtime_error) {
     } else {
       /* TODO Other tracking methods */
     }
-    //this->tracking_engine_->TrackCamera(*view_, *point_cloud_, *camera_pose_, camera_pose_);
-    this->tracking_engine_->TrackCamera(*view_, *point_cloud_, *camera_pose_, nullptr);
+    this->tracking_engine_->TrackCamera(*view_, *point_cloud_, *camera_pose_, camera_pose_);
+    //this->tracking_engine_->TrackCamera(*view_, *point_cloud_, *camera_pose_, nullptr);
     LOG->WriteLineF("\033[31;1m\t%.2fms\033[0m", ms=((t=clock()-start)*1000.0/CLOCKS_PER_SEC));
     total_ms += ms;
   }

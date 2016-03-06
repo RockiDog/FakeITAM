@@ -47,7 +47,7 @@ MainEngine* g_main_engine = nullptr;
 const ImageRGB8u* g_rgb_image = nullptr;
 const ImageMono32f* g_depth_image = nullptr;
 const ViewPyramid* g_view_pyramid = nullptr;
-const GLsizei vbo_n = 3;
+const GLsizei vbo_n = 4;
 GLuint pcl_vbos[vbo_n];
 GLuint color_vbos[vbo_n];
 
@@ -104,7 +104,7 @@ void ProjectGlobal3DCoordinatesToCurrentPerspectiveThenConvertTheirFuckingDepths
     const Matrix4f& Tg,
     ImageRGBA8u* rgba) {
   for (int i = 0; i < points.element_n(); ++i) {
-    if (points[i].w < 0) {
+    if (points[i].w <= 0) {
       (*rgba)[i].set(0, 0, 0, 0);
     } else {
       const Vector4f& point = points[i];
@@ -166,6 +166,7 @@ void DisplayFunc() {
       glTexCoord2f(0, 1); glVertex3f(g_win_width / 3, 0, -100);                     /* bottom-left */
     } glEnd();
     
+    /* Display rendering result */
     glBindTexture(GL_TEXTURE_2D, textures[3]);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE,
                  g_main_engine->view_size().x, g_main_engine->view_size().y,
@@ -234,53 +235,63 @@ void DisplayFunc2() {
   glPushMatrix(); {
     glRotatef(180, 1, 0, 0);
     glTranslatef(g_translate_x + 800, g_translate_y, g_translate_z + 500);
-    glRotatef(g_rotate_angle_h - 90, 0, 1, 0);
+    glRotatef(g_rotate_angle_h, 0, 1, 0);
     glRotatef(g_rotate_angle_v, 1, 0, 0);
-    glScalef(g_scale, g_scale, g_scale);
+    
+    glColor3f(1, 0, 0);
+    glutWireSphere(0.5, 20, 20);
+
+    glScalef(g_scale / gVoxelMetricSize, g_scale / gVoxelMetricSize, g_scale / gVoxelMetricSize);
+    glPointSize(3);
+    
+    glEnableClientState(GL_VERTEX_ARRAY);
+    //  glEnableClientState(GL_COLOR_ARRAY);
+    //  glBindBuffer(GL_ARRAY_BUFFER, pcl_vbos[0]);
+    //  glVertexPointer(3, GL_FLOAT, 0, nullptr);
+    //  glBufferData(GL_ARRAY_BUFFER,
+    //               sizeof(float) * 3 * g_main_engine->GetReconstructionEngine()->pcl_cnt,
+    //               g_main_engine->GetReconstructionEngine()->pcl->GetData(),
+    //               GL_STATIC_DRAW);
+    //  glBindBuffer(GL_ARRAY_BUFFER, color_vbos[0]);
+    //  glColorPointer(3, GL_FLOAT, 0, nullptr);
+    //  glBufferData(GL_ARRAY_BUFFER,
+    //               sizeof(float) * 3 * g_main_engine->GetReconstructionEngine()->pcl_cnt2,
+    //               g_main_engine->GetReconstructionEngine()->pcl2->GetData(),
+    //               GL_STATIC_DRAW);
+    //  glDrawArrays(GL_POINTS, 0, g_main_engine->GetReconstructionEngine()->pcl_cnt2);
+    //  glDisableClientState(GL_COLOR_ARRAY);
+    //  
+    //  glColor3f(0, 0.8, 0);
+    //  glBindBuffer(GL_ARRAY_BUFFER, pcl_vbos[1]);
+    //  glVertexPointer(3, GL_FLOAT, 0, nullptr);
+    //  glBufferData(GL_ARRAY_BUFFER,
+    //               sizeof(float) * 3 * g_main_engine->GetRenderingEngine()->pcl_cnt,
+    //               g_main_engine->GetRenderingEngine()->pcl->GetData(),
+    //               GL_STATIC_DRAW);
+    //  glDrawArrays(GL_POINTS, 0, g_main_engine->GetReconstructionEngine()->pcl_cnt);
+    //  
+    //  glColor3f(0, 0, 0.8);
+    //  glBindBuffer(GL_ARRAY_BUFFER, pcl_vbos[2]);
+    //  glVertexPointer(3, GL_FLOAT, 0, nullptr);
+    //  glBufferData(GL_ARRAY_BUFFER,
+    //               sizeof(float) * 3 * g_main_engine->GetRenderingEngine()->pcl_cnt2,
+    //               g_main_engine->GetRenderingEngine()->pcl2->GetData(),
+    //               GL_STATIC_DRAW);
+    //  glDrawArrays(GL_POINTS, 0, g_main_engine->GetRenderingEngine()->pcl_cnt2);
     
     glColor3f(1, 1, 1);
-    glutWireSphere(0.5, 20, 20);
-    
-    //glPointSize(3);
-    glEnableClientState(GL_VERTEX_ARRAY);
-    glEnableClientState(GL_COLOR_ARRAY);
-    glBindBuffer(GL_ARRAY_BUFFER, pcl_vbos[0]);
-    glVertexPointer(3, GL_FLOAT, 0, nullptr);
+    glBindBuffer(GL_ARRAY_BUFFER, pcl_vbos[3]);
+    glVertexPointer(4, GL_FLOAT, 0, nullptr);
     glBufferData(GL_ARRAY_BUFFER,
-                 sizeof(float) * 3 * g_main_engine->GetReconstructionEngine()->pcl_cnt,
-                 g_main_engine->GetReconstructionEngine()->pcl->GetData(),
+                 sizeof(float) * 4 * g_main_engine->point_cloud()->locations()->element_n(),
+                 g_main_engine->point_cloud()->locations()->GetData(),
                  GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, color_vbos[0]);
-    glColorPointer(3, GL_FLOAT, 0, nullptr);
-    glBufferData(GL_ARRAY_BUFFER,
-                 sizeof(float) * 3 * g_main_engine->GetReconstructionEngine()->pcl_cnt2,
-                 g_main_engine->GetReconstructionEngine()->pcl2->GetData(),
-                 GL_STATIC_DRAW);
-    glDrawArrays(GL_POINTS, 0, g_main_engine->GetReconstructionEngine()->pcl_cnt2);
-    glDisableClientState(GL_COLOR_ARRAY);
-    
-    glColor3f(0, 0.8, 0);
-    glBindBuffer(GL_ARRAY_BUFFER, pcl_vbos[1]);
-    glVertexPointer(3, GL_FLOAT, 0, nullptr);
-    glBufferData(GL_ARRAY_BUFFER,
-                 sizeof(float) * 3 * g_main_engine->GetRenderingEngine()->pcl_cnt,
-                 g_main_engine->GetRenderingEngine()->pcl->GetData(),
-                 GL_STATIC_DRAW);
-    glDrawArrays(GL_POINTS, 0, g_main_engine->GetReconstructionEngine()->pcl_cnt);
-    
-    glColor3f(0, 0, 0.8);
-    glBindBuffer(GL_ARRAY_BUFFER, pcl_vbos[2]);
-    glVertexPointer(3, GL_FLOAT, 0, nullptr);
-    glBufferData(GL_ARRAY_BUFFER,
-                 sizeof(float) * 3 * g_main_engine->GetRenderingEngine()->pcl_cnt2,
-                 g_main_engine->GetRenderingEngine()->pcl2->GetData(),
-                 GL_STATIC_DRAW);
-    glDrawArrays(GL_POINTS, 0, g_main_engine->GetRenderingEngine()->pcl_cnt2);
+    glDrawArrays(GL_POINTS, 0, g_main_engine->point_cloud()->locations()->element_n());
     glDisableClientState(GL_VERTEX_ARRAY);
   }; glPopMatrix();
 
   glPushMatrix(); {
-    glColor3f(1, 1, 1);
+    glColor3f(0.1, 0.1, 0.1);
     glTranslatef(10 + g_scale / 2,
                  -g_win_height / 3 + 10 + g_scale / 2,
                  -(10 + g_scale / 2));
@@ -421,8 +432,8 @@ int main(int argc, char* argv[]) {
   const char* rgb_file = argv[2];
   const char* grey_file = argv[3];
   g_main_engine = new MainEngine(calib_file, rgb_file, grey_file);
-  g_win_width = g_main_engine->view_size().x * 1.5;
-  g_win_height = g_main_engine->view_size().y * 1.5;
+  g_win_width = g_main_engine->view_size().x * 1.7;
+  g_win_height = g_main_engine->view_size().y * 1.7;
   g_greyscale_image = new ImageMono8u(g_main_engine->view_size().x * g_main_engine->view_size().y, MEM_CPU);
   g_pcl_image = new ImageRGBA8u(g_main_engine->view_size().x * g_main_engine->view_size().y, MEM_CPU);
   g_ray_length_min = new ImageMono8u(g_main_engine->GetRenderingEngine()->range_resolution()->x *
@@ -435,6 +446,7 @@ int main(int argc, char* argv[]) {
 
   glutInitWindowSize(g_win_width + g_win_width / 3 * 2, g_win_height);
   glutCreateWindow("Test Window");
+
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
   glOrtho(0, g_win_width + g_win_width / 3 * 2, -g_win_height / 3, g_win_height / 3 * 2, 0, 10000);
