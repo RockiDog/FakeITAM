@@ -257,8 +257,8 @@ void RenderingEngine::FullRaycast(
       end_g.z = range.y;
       end_g.w = 1;
       end_g = Tg_in * end_g;
-      (*pcl)[pcl_cnt++] = start_g.ProjectTo3d() / gVoxelMetricSize;
-      (*pcl2)[pcl_cnt2++] = end_g.ProjectTo3d() / gVoxelMetricSize;
+      //(*pcl)[pcl_cnt++] = start_g.ProjectTo3d() / gVoxelMetricSize;
+      //(*pcl2)[pcl_cnt2++] = end_g.ProjectTo3d() / gVoxelMetricSize;
       Vector4f& intersection = (*points_out)[x + y * view_in.size.x];
       CastRay(scene_in, start_g, end_g, x, y, &intersection);
     }

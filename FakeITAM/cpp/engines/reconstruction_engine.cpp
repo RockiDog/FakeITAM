@@ -330,10 +330,10 @@ void ReconstructionEngine::UpdateVoxelTsdfAndWeight(const Vector2i& view_size_in
   voxel_out->weight = (old_W + new_W) > max_W ? max_W : (old_W + new_W);
   if (255 - fabs(new_tsdf) * 255 > (*tsdf_map)[pixel.x + pixel.y * view_size_in.x])
     (*tsdf_map)[pixel.x + pixel.y * view_size_in.x] = 255 - (fabs(new_tsdf) <= 1 ? fabs(new_tsdf) * 255 : 255);
-  if (point_g_in.w > 0) {
-    (*pcl)[pcl_cnt++] = point_g_in.ProjectTo3d() / gVoxelMetricSize;
-    (*pcl2)[pcl_cnt2].x = 1 - (fabs(new_tsdf) <= 1 ? fabs(new_tsdf) : 1);
-    (*pcl2)[pcl_cnt2].y = 1 - (fabs(new_tsdf) <= 1 ? fabs(new_tsdf) : 1);
-    (*pcl2)[pcl_cnt2++].z = 1 - (fabs(new_tsdf) <= 1 ? fabs(new_tsdf) : 1);
-  }
+  //if (point_g_in.w > 0) {
+  //  (*pcl)[pcl_cnt++] = point_g_in.ProjectTo3d() / gVoxelMetricSize;
+  //  (*pcl2)[pcl_cnt2].x = 1 - (fabs(new_tsdf) <= 1 ? fabs(new_tsdf) : 1);
+  //  (*pcl2)[pcl_cnt2].y = 1 - (fabs(new_tsdf) <= 1 ? fabs(new_tsdf) : 1);
+  //  (*pcl2)[pcl_cnt2++].z = 1 - (fabs(new_tsdf) <= 1 ? fabs(new_tsdf) : 1);
+  //}
 }

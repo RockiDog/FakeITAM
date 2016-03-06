@@ -76,6 +76,7 @@ bool g_right_pressed = false, g_right_released = true;
 bool g_middle_pressed = false, g_middle_released = true;
 
 int g_mouse_x, g_mouse_y;
+int g_display_fun_id = 0;
 
 }
 
@@ -115,12 +116,13 @@ void ProjectGlobal3DCoordinatesToCurrentPerspectiveThenConvertTheirFuckingDepths
   }
 }
 
-void DisplayFunc() {
+void DisplayFunc0() {
   if (g_rgb_image == nullptr)
     return;
 
   /* Do the actual drawing */
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  glColor4f(1, 1, 1, 1);
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
 
@@ -209,12 +211,13 @@ void DisplayFunc() {
   glutSwapBuffers();
 }
 
-void DisplayFunc2() {
+void DisplayFunc1() {
   if (g_rgb_image == nullptr)
     return;
 
   /* Do the actual drawing */
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  glColor4f(1, 1, 1, 1);
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
 
@@ -267,6 +270,7 @@ void DisplayFunc2() {
     //  glDrawArrays(GL_POINTS, 0, g_main_engine->GetRenderingEngine()->pcl_cnt2);
     
     glColor3f(1, 1, 1);
+    glPointSize(2);
     glBindBuffer(GL_ARRAY_BUFFER, pcl_vbos[3]);
     glVertexPointer(3, GL_FLOAT, sizeof(float) * 4, nullptr);
     glBufferData(GL_ARRAY_BUFFER,
@@ -289,8 +293,18 @@ void DisplayFunc2() {
   glutSwapBuffers();
 }
 
+void DisplayFunc() {
+  switch (g_display_fun_id) {
+    case 0 : DisplayFunc0(); break;
+    case 1 : DisplayFunc1(); break;
+  }
+}
+
 void KeyboardFunc(unsigned char key, int x, int y) {
   switch (key) {
+    case 'f' :
+    case 'F' : { g_display_fun_id = 1 - g_display_fun_id; DisplayFunc(); } break;
+    
     case 'n' :
     case 'N' :
     case 13  : { g_stalled = false; g_auto = false; } break;
