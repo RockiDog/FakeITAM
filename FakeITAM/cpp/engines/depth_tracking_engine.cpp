@@ -11,7 +11,6 @@
 #include <cmath>
 
 #include "global_config.hpp"
-#include "engines/log_engine.hpp"
 #include "engines/library/camera_pose.hpp"
 #include "engines/library/image_utils.hpp"
 #include "engines/library/point_cloud.hpp"

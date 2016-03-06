@@ -93,8 +93,7 @@ class RenderingEngine {
                const utility::Vector4f& start_g_in,
                const utility::Vector4f& end_g_in,
                      int x, int y,
-                     utility::Vector4f* point_out,
-               const utility::Vector4f& intrinsics_in = utility::Vector4f());
+                     utility::Vector4f* point_out);
 
   bool GetBoundingBox(const utility::Vector3i& block_in,
                       const View& view_in,
@@ -102,8 +101,7 @@ class RenderingEngine {
                       const utility::Matrix4f& Ti_g_in,
                             BoundingBox* bounding_box_out);
 
-  bool ReadNearestTsdf(const Scene& scene_in, const utility::Vector3f& point_in, float* tsdf_out,
-               const utility::Vector4f& intrinsics_in = utility::Vector4f());
+  bool ReadNearestTsdf(const Scene& scene_in, const utility::Vector3f& point_in, float* tsdf_out);
   void ReadInterpolatedTsdf(const Scene& scene_in, const utility::Vector3f& point_in, float* tsdf_out);
   void TrilinearInterpolation(const VoxelBlockHashMap& index_in,
                               const utility::MemBlock<Voxel>& src_in,

@@ -25,7 +25,7 @@ const unsigned char USE_GPU_ACCELERATION   = 0x01 << 6;  /* b0100_0000 */
 const unsigned char USE_DEBUG_MODE         = 0x01 << 7;  /* b1000_0000 */
 
 const unsigned char gInitializationFlags = USE_DEPTH_TRACKING |
-                                           //USE_FORWARD_PROJECTION |
+                                           USE_FORWARD_PROJECTION |
                                            USE_DEBUG_MODE;
 
 const float gMathFloatEpsilon = std::numeric_limits<float>::epsilon();

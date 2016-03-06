@@ -12,7 +12,6 @@
 #include <vector>
 
 #include "global_config.hpp"
-#include "engines/log_engine.hpp"
 #include "engines/reconstruction_engine.hpp"
 #include "engines/tracking_engine.hpp"
 #include "engines/library/block_hash_manager.hpp"
@@ -53,13 +52,11 @@ RenderingEngine::~RenderingEngine() {
 }
 
 /* TODO Test */
-static int cnt = 0;
 void RenderingEngine::FullRenderIcpMaps(const Scene& scene_in,
                                         const View& view_in,
                                         const CameraPose& pose_in,
                                               PointCloud* pcl_out) {
   tsdf_map->ResetData();
-  cnt = 0;
 
   const vector<int>& visible_blocks = scene_in.visible_list();
   const Matrix4f& Tg = pose_in.m;
@@ -75,8 +72,6 @@ void RenderingEngine::FullRenderIcpMaps(const Scene& scene_in,
     pcl_out->normals()->CopyBytesFrom(normals.GetData(), normals.byte_capacity());
     pcl_out->set_camera_pose(pose_in);
   }
-
-  LOG->WriteLine()->WriteLine(E, cnt);
 }
 
 /* TODO Test */
@@ -265,7 +260,7 @@ void RenderingEngine::FullRaycast(
       (*pcl)[pcl_cnt++] = start_g.ProjectTo3d() / gVoxelMetricSize;
       (*pcl2)[pcl_cnt2++] = end_g.ProjectTo3d() / gVoxelMetricSize;
       Vector4f& intersection = (*points_out)[x + y * view_in.size.x];
-      CastRay(scene_in, start_g, end_g, x, y, &intersection, intrinsics);
+      CastRay(scene_in, start_g, end_g, x, y, &intersection);
     }
   }
 }
@@ -312,8 +307,7 @@ void RenderingEngine::CastRay(const Scene& scene_in,
                               const Vector4f& start_g_in,
                               const Vector4f& end_g_in,
                                     int x, int y,
-                                    Vector4f* point_out,
-                              const Vector4f& intrinsics_in) {
+                                    Vector4f* point_out) {
   float total_length = (end_g_in - start_g_in).GetNorm();
   float length = 0;
   Vector3f point {start_g_in.x, start_g_in.y, start_g_in.z};
@@ -322,7 +316,7 @@ void RenderingEngine::CastRay(const Scene& scene_in,
   float tsdf = 1;
   while (length < total_length) {
     float step_length;
-    if (ReadNearestTsdf(scene_in, point, &tsdf, intrinsics_in) == false) {
+    if (ReadNearestTsdf(scene_in, point, &tsdf) == false) {
       /* Jump by block size */
       step_length = gVoxelBlockSizeL * gVoxelMetricSize;
     } else {
@@ -416,8 +410,7 @@ bool RenderingEngine::GetBoundingBox(const Vector3i& block_in,
 
 bool RenderingEngine::ReadNearestTsdf(const Scene& scene_in,
                                       const Vector3f& point_in,
-                                            float* tsdf_out,
-                                      const utility::Vector4f& intrinsics_in) {
+                                            float* tsdf_out) {
   const float block_metric_size = gVoxelMetricSize * gVoxelBlockSizeL;
   const VoxelBlockHashMap& index = *(scene_in.index());
   const MemBlock<Voxel>& voxel_array = *(scene_in.local_voxel_array());

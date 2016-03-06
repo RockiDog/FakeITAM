@@ -107,16 +107,18 @@ void MainEngine::ProcessOneFrame() throw(std::runtime_error) {
   const ImageRGB8u* rgb_frame;
   const ImageMono16u* raw_disparity_map;
   this->image_engine_->NextRGBDFrame(&rgb_frame, &raw_disparity_map);
-  //this->image_engine_->set_current_frame_n(0); this->image_engine_->CurrentRGBDFrame(&rgb_frame, &raw_disparity_map);
-  LOG->WriteLineF("\033[31;1m\t%.2fms\033[0m", ms=((t=clock()-start)*1000.0/CLOCKS_PER_SEC));
-  total_ms += ms;
+  LOG->WriteLineF("\033[31;1m\t%.2fms\033[0m", ms=((t=clock())-start)*1000.0/CLOCKS_PER_SEC);
+  total_ms += ms; start = t;
+
+  //ms=-((t=start)-(start=clock()))*1000.0/CLOCKS_PER_SEC;
+  //ms=()*1000.0/CLOCKS_PER_SEC;
 
   /* Step 2: Construct current "View" */
   LOG->Write(I, "constructing the current view ... ... ... ");
   view_->SetRGBDFrame(rgb_frame, raw_disparity_map);
   this->view_manager_->UpdateView(view_);
-  LOG->WriteLineF("\033[31;1m\t%.2fms\033[0m", ms=((t=clock()-start)*1000.0/CLOCKS_PER_SEC));
-  total_ms += ms;
+  LOG->WriteLineF("\033[31;1m\t%.2fms\033[0m", ms=((t=clock())-start)*1000.0/CLOCKS_PER_SEC);
+  total_ms += ms; start = t;
 
   /* Step 3: Track the camera "CameraPose" */
   if (cycles_ > 0) {  /* Do not track camera at the first cycle */
@@ -128,9 +130,8 @@ void MainEngine::ProcessOneFrame() throw(std::runtime_error) {
       /* TODO Other tracking methods */
     }
     this->tracking_engine_->TrackCamera(*view_, *point_cloud_, *camera_pose_, camera_pose_);
-    //this->tracking_engine_->TrackCamera(*view_, *point_cloud_, *camera_pose_, nullptr);
-    LOG->WriteLineF("\033[31;1m\t%.2fms\033[0m", ms=((t=clock()-start)*1000.0/CLOCKS_PER_SEC));
-    total_ms += ms;
+    LOG->WriteLineF("\033[31;1m\t%.2fms\033[0m", ms=((t=clock())-start)*1000.0/CLOCKS_PER_SEC);
+    total_ms += ms; start = t;
   }
   LOG->WriteLine()->Write(D, "\tTg: ")->WriteLine(camera_pose_->m)->WriteLine();
 
@@ -138,8 +139,8 @@ void MainEngine::ProcessOneFrame() throw(std::runtime_error) {
   LOG->Write(I, "reconstructing the world scene ... ... ... ");
   this->reconstruction_engine_->AllocateWorldSceneFromView(*view_, *camera_pose_, world_scene_);
   this->reconstruction_engine_->IntegrateVoxelsToWorldScene(*view_, *camera_pose_, world_scene_);
-  LOG->WriteLineF("\033[31;1m\t%.2fms\033[0m", ms=((t=clock()-start)*1000.0/CLOCKS_PER_SEC));
-  total_ms += ms;
+  LOG->WriteLineF("\033[31;1m\t%.2fms\033[0m", ms=((t=clock())-start)*1000.0/CLOCKS_PER_SEC);
+  total_ms += ms; start = t;
 
   /* Step 5: Render the "PointCloud" for next time tracking */
   if (gInitializationFlags & USE_FORWARD_PROJECTION) {
@@ -166,8 +167,8 @@ void MainEngine::ProcessOneFrame() throw(std::runtime_error) {
     this->rendering_engine_->FullRenderIcpMaps(*world_scene_, *view_, *camera_pose_, point_cloud_);
     point_cloud_->ResetAge();
   }
-  LOG->WriteLineF("\033[31;1m\t%.2fms\033[0m", ms=((t=clock()-start)*1000.0/CLOCKS_PER_SEC));
-  total_ms += ms;
+  LOG->WriteLineF("\033[31;1m\t%.2fms\033[0m", ms=((t=clock())-start)*1000.0/CLOCKS_PER_SEC);
+  total_ms += ms; start = t;
 
   LOG->Write(I)
      ->WriteLineF("\033[31;1;4m\t****** current cycle ##%d accomplished (%.2fms) ******\033[0m", cycles_, total_ms)

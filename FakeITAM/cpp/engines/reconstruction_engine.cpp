@@ -12,7 +12,6 @@
 #include <vector>
 
 #include "global_config.hpp"
-#include "engines/log_engine.hpp"
 #include "engines/tracking_engine.hpp"
 #include "engines/library/block_hash_manager.hpp"
 #include "engines/library/camera_pose.hpp"
@@ -48,7 +47,6 @@ ReconstructionEngine::~ReconstructionEngine() {
 void ReconstructionEngine::ResetWorldScene(Scene* scene_out) { }
 
 /* TODO Test */
-static int cnt = 0;
 void ReconstructionEngine::AllocateWorldSceneFromView(const View& view_in,
                                                       const CameraPose& camera_pose_in,
                                                             Scene* scene_out) {
@@ -212,7 +210,6 @@ void ReconstructionEngine::UpdateHashEntriesAndBlockCache(const View& view_in,
 void ReconstructionEngine::IntegrateVoxelsToWorldScene(const View& view_in,
                                                        const CameraPose& camera_pose_in,
                                                              Scene* scene_out) {
-  cnt = 0;
   const MemBlock<float>& depth = *(view_in.depth_map);
   const Vector2i& view_size = view_in.size;
   const Vector4f& intrinsics = view_in.intrinsics;
@@ -250,7 +247,6 @@ void ReconstructionEngine::IntegrateVoxelsToWorldScene(const View& view_in,
       }
     }
   }
-  LOG->WriteLine()->WriteLine(E, cnt);
 }
 
 /* TODO Test */

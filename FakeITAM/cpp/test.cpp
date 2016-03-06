@@ -166,11 +166,10 @@ void DisplayFunc() {
       glTexCoord2f(0, 1); glVertex3f(g_win_width / 3, 0, -100);                     /* bottom-left */
     } glEnd();
     
-    /* Display rendering result */
+    /* Display the point cloud */
     glBindTexture(GL_TEXTURE_2D, textures[3]);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE,
-                 g_main_engine->view_size().x, g_main_engine->view_size().y,
-                 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, g_main_engine->GetRenderingEngine()->tsdf_map->GetData());
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_main_engine->view_size().x, g_main_engine->view_size().y,
+                 0, GL_RGBA, GL_UNSIGNED_BYTE, g_pcl_image->GetData());
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBegin(GL_QUADS); {
@@ -204,19 +203,6 @@ void DisplayFunc() {
         anchor += g_win_width / 3;
       }
     }
-    
-    /* Display point cloud */
-    glBindTexture(GL_TEXTURE_2D, textures[7]);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_main_engine->view_size().x, g_main_engine->view_size().y,
-                 0, GL_RGBA, GL_UNSIGNED_BYTE, g_pcl_image->GetData());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glBegin(GL_QUADS); {
-      glTexCoord2f(0, 0); glVertex3f(g_win_width, 0, -100);                                    /* top-left */
-      glTexCoord2f(1, 0); glVertex3f(g_win_width + g_win_width / 3, 0, -100);                  /* top-right */
-      glTexCoord2f(1, 1); glVertex3f(g_win_width + g_win_width / 3, -g_win_height / 3, -100);  /* bottom-right */
-      glTexCoord2f(0, 1); glVertex3f(g_win_width, -g_win_height / 3, -100);                    /* bottom-left */
-    } glEnd();
   } glPopMatrix();
   glDisable(GL_TEXTURE_2D);
 
@@ -239,12 +225,13 @@ void DisplayFunc2() {
     glRotatef(g_rotate_angle_v, 1, 0, 0);
     
     glColor3f(1, 0, 0);
-    glutWireSphere(0.5, 20, 20);
-
+    glutWireSphere(10, 20, 20);
+    
     glScalef(g_scale / gVoxelMetricSize, g_scale / gVoxelMetricSize, g_scale / gVoxelMetricSize);
-    glPointSize(3);
+    //glPointSize(3);
     
     glEnableClientState(GL_VERTEX_ARRAY);
+    
     //  glEnableClientState(GL_COLOR_ARRAY);
     //  glBindBuffer(GL_ARRAY_BUFFER, pcl_vbos[0]);
     //  glVertexPointer(3, GL_FLOAT, 0, nullptr);
@@ -281,7 +268,7 @@ void DisplayFunc2() {
     
     glColor3f(1, 1, 1);
     glBindBuffer(GL_ARRAY_BUFFER, pcl_vbos[3]);
-    glVertexPointer(4, GL_FLOAT, 0, nullptr);
+    glVertexPointer(3, GL_FLOAT, sizeof(float) * 4, nullptr);
     glBufferData(GL_ARRAY_BUFFER,
                  sizeof(float) * 4 * g_main_engine->point_cloud()->locations()->element_n(),
                  g_main_engine->point_cloud()->locations()->GetData(),
@@ -461,7 +448,7 @@ int main(int argc, char* argv[]) {
   glutSpecialFunc(SpecialKeyFunc);
   glutMouseFunc(MouseFunc);
   glutMotionFunc(MouseMotionFunc);
-  glutDisplayFunc(DisplayFunc2);
+  glutDisplayFunc(DisplayFunc);
   glutIdleFunc(IdleFunc);
   try {
     glutMainLoop();
