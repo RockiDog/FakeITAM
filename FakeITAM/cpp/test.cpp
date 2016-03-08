@@ -228,10 +228,14 @@ void DisplayFunc1() {
     glRotatef(g_rotate_angle_v, 1, 0, 0);
     
     glColor3f(1, 0, 0);
-    glutWireSphere(10, 20, 20);
+    glPushMatrix(); {
+      glTranslatef(g_main_engine->camera_pose()->t().x / gVoxelMetricSize,
+                   g_main_engine->camera_pose()->t().y / gVoxelMetricSize,
+                   g_main_engine->camera_pose()->t().z / gVoxelMetricSize);
+      glutWireSphere(10, 20, 20);
+    } glPopMatrix();
     
     glScalef(g_scale / gVoxelMetricSize, g_scale / gVoxelMetricSize, g_scale / gVoxelMetricSize);
-    //glPointSize(3);
     
     glEnableClientState(GL_VERTEX_ARRAY);
     
@@ -288,7 +292,7 @@ void DisplayFunc1() {
                  -(10 + g_scale / 2));
     glScalef(g_scale, g_scale, g_scale);
     glutSolidCube(1);
-  } glPushMatrix();
+  } glPopMatrix();
 
   glutSwapBuffers();
 }
