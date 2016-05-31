@@ -31,11 +31,6 @@ RenderingEngine::RenderingEngine(Vector2i view_size) {
   range_resolution_ = new Vector2i(ceil(view_size.x * 1.0 / gBoundBoxSubsample),
                                    ceil(view_size.y * 1.0 / gBoundBoxSubsample));
   ray_length_range_ = new MemBlock<Vector2f>(range_resolution_->x * range_resolution_->y, MEM_CPU);
-  tsdf_map = new ImageMono8u(640 * 480, MEM_CPU);
-  pcl = new utility::MemBlock<utility::Vector3f>(200 * 640 * 480, MEM_CPU);
-  pcl_cnt = 0;
-  pcl2 = new utility::MemBlock<utility::Vector3f>(200 * 640 * 480, MEM_CPU);
-  pcl_cnt2 = 0;
 }
 
 RenderingEngine::~RenderingEngine() {
@@ -43,12 +38,6 @@ RenderingEngine::~RenderingEngine() {
   delete ray_length_range_;
   range_resolution_ = nullptr;
   ray_length_range_ = nullptr;
-
-  delete tsdf_map;
-  delete pcl;
-  delete pcl2;
-  tsdf_map = nullptr;
-  pcl2 = nullptr;
 }
 
 /* TODO Test */
@@ -56,8 +45,6 @@ void RenderingEngine::FullRenderIcpMaps(const Scene& scene_in,
                                         const View& view_in,
                                         const CameraPose& pose_in,
                                               PointCloud* pcl_out) {
-  tsdf_map->ResetData();
-
   const vector<int>& visible_blocks = scene_in.visible_list();
   const Matrix4f& Tg = pose_in.m;
   const Matrix4f Ti_g = GetInverse(Tg);

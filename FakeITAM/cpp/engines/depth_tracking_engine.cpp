@@ -1,5 +1,5 @@
 //
-//  DepthTrackingEngine.cpp
+//  depth_tracking_engine.cpp
 //  FakeITAM
 //
 //  Created by Soap on 15/11/21.
@@ -33,7 +33,6 @@ void DepthTrackingEngine::TrackCamera(const View& view_in,
                                       const CameraPose& pose_in,
                                             CameraPose* pose_out) {
   /* Set up initial parameters */
-  //ViewPyramid view_pyramid(gDepthTrackIcpLevelNum, gDepthTrackTopIcpThreshold, view_in);
   if (view_pyramid_ != nullptr)
     delete view_pyramid_;
   view_pyramid_ = new ViewPyramid(gDepthTrackIcpLevelNum, gDepthTrackTopIcpThreshold, view_in);
@@ -175,8 +174,8 @@ void DepthTrackingEngine::ComputeAtAndB(const Matrix4f& Tg_last_estimate_in,
   );
   if (pixel_2d_reproj.x <= -gDepthTrackMaxPixelError ||
       pixel_2d_reproj.y <= -gDepthTrackMaxPixelError ||
-      pixel_2d_reproj.x >= bottom->size.x + gDepthTrackMaxPixelError ||
-      pixel_2d_reproj.y >= bottom->size.y + gDepthTrackMaxPixelError) {
+      pixel_2d_reproj.x >= bottom->size.x + gDepthTrackMaxPixelError - 1 ||
+      pixel_2d_reproj.y >= bottom->size.y + gDepthTrackMaxPixelError - 1) {
     (*valid_out) = false;
     return;
   }
@@ -187,7 +186,7 @@ void DepthTrackingEngine::ComputeAtAndB(const Matrix4f& Tg_last_estimate_in,
   point_3d_estimate_g.y = point_4d_estimate_g(1, 0);
   point_3d_estimate_g.z = point_4d_estimate_g(2, 0);
 
-  /* 3D global point & narmal prediction, from world model */
+  /* 3D global point & normal prediction, from world model */
   const MemBlock<Vector4f>* global_vertices = global_pcl_in.locations();
   const MemBlock<Vector4f>* global_normals = global_pcl_in.normals();
   Vector4f point_4d_prediction_g = BilinearInterpolationWithHoles(*global_vertices, pixel_2d_reproj, bottom->size);
@@ -197,7 +196,7 @@ void DepthTrackingEngine::ComputeAtAndB(const Matrix4f& Tg_last_estimate_in,
     return;
   }
   Vector3f point_3d_prediction_g = point_4d_prediction_g.ProjectTo3d();
-  Vector3f normal_prediction_g = normal_4d_prediction_g.ProjectTo3d();
+  Vector3f normal_3d_prediction_g = normal_4d_prediction_g.ProjectTo3d();
 
   Vector3f point_3d_diff = point_3d_prediction_g - point_3d_estimate_g;
   float dist2 = point_3d_diff.GetNorm2();
@@ -212,10 +211,10 @@ void DepthTrackingEngine::ComputeAtAndB(const Matrix4f& Tg_last_estimate_in,
     -point_3d_estimate_g.y, point_3d_estimate_g.x, 0, 0, 0, 1,
   };
   Matrix<float, 6, 3> Gt = G.GetTranspose();
-  (*At_out) = Gt * (Matrix<float, 3, 1>)(normal_prediction_g);
+  (*At_out) = Gt * (Matrix<float, 3, 1>)(normal_3d_prediction_g);
 
   Matrix<float, 3, 1> temp_point_3d_diff = point_3d_diff;
-  Matrix<float, 3, 1> temp_normal_prediction_g = normal_prediction_g;
+  Matrix<float, 3, 1> temp_normal_prediction_g = normal_3d_prediction_g;
   (*b_out) = temp_normal_prediction_g.GetTranspose() * temp_point_3d_diff;
   (*valid_out) = true;
   (*error_function_out) = ((*b_out) * (*b_out))(0, 0);

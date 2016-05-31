@@ -25,7 +25,7 @@ const unsigned char USE_GPU_ACCELERATION   = 0x01 << 6;  /* b0100_0000 */
 const unsigned char USE_DEBUG_MODE         = 0x01 << 7;  /* b1000_0000 */
 
 const unsigned char gInitializationFlags = USE_DEPTH_TRACKING |
-                                           USE_FORWARD_PROJECTION |
+                                           //USE_FORWARD_PROJECTION |
                                            USE_DEBUG_MODE;
 
 const float gMathFloatEpsilon = std::numeric_limits<float>::epsilon();
@@ -45,12 +45,12 @@ const float gTsdfBandWidthMu = 0.02;  /* in meter */
 const int gTsdfMaxWeight = 100;
 
 /* gBlockHashOrderedArraySize + gBlockHashExcessListSize */
-const int gBlockHashMapSize          = 0x120000;
-const int gBlockHashOrderedArraySize = 0x100000;
-const int gBlockHashExcessListSize   =  0x20000;
+const int gBlockHashMapSize          = 0x12000;
+const int gBlockHashOrderedArraySize = 0x10000;
+const int gBlockHashExcessListSize   =  0x2000;
 const int gBlockHashLocalNum         =  0x40000;
 
-const float gVoxelMetricSize = 0.005;  /* in meter */
+const float gVoxelMetricSize = 0.001;  /* in meter */
 const int gVoxelBlockSizeL =   8;      /* linear */
 const int gVoxelBlockSizeQ =  64;      /* quadric */
 const int gVoxelBlockSizeC = 512;      /* cubic */

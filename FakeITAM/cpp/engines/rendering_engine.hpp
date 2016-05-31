@@ -51,12 +51,6 @@ class RenderingEngine {
   RenderingEngine(utility::Vector2i view_size);
   virtual ~RenderingEngine();
 
-  ImageMono8u* tsdf_map;
-  utility::MemBlock<utility::Vector3f>* pcl;
-  int pcl_cnt;
-  utility::MemBlock<utility::Vector3f>* pcl2;
-  int pcl_cnt2;
-
   const utility::Vector2i* range_resolution() const { return range_resolution_; }
   const utility::MemBlock<utility::Vector2f>* ray_length_range() const { return ray_length_range_; }
 

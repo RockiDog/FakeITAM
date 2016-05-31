@@ -22,6 +22,7 @@
 #endif
 
 #include <stdexcept>
+#include <vector>
 
 #include "global_config.hpp"
 #include "engines/depth_tracking_engine.hpp"
@@ -77,6 +78,8 @@ bool g_middle_pressed = false, g_middle_released = true;
 
 int g_mouse_x, g_mouse_y;
 int g_display_fun_id = 0;
+
+vector<Vector3f> g_camera_poses;
 
 }
 
@@ -154,11 +157,10 @@ void DisplayFunc0() {
       glTexCoord2f(0, 1); glVertex3f(0, 0, -100);                               /* bottom-left */
     } glEnd();
     
-    /* Display reconstruction result */
+    /* Display the point cloud */
     glBindTexture(GL_TEXTURE_2D, textures[2]);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE,
-                 g_main_engine->view_size().x, g_main_engine->view_size().y,
-                 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, g_main_engine->GetReconstructionEngine()->tsdf_map->GetData());
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_main_engine->view_size().x, g_main_engine->view_size().y,
+                 0, GL_RGBA, GL_UNSIGNED_BYTE, g_pcl_image->GetData());
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBegin(GL_QUADS); {
@@ -166,19 +168,6 @@ void DisplayFunc0() {
       glTexCoord2f(1, 0); glVertex3f(g_win_width, g_win_height / 3 * 2, -100);      /* top-right */
       glTexCoord2f(1, 1); glVertex3f(g_win_width, 0, -100);                         /* bottom-right */
       glTexCoord2f(0, 1); glVertex3f(g_win_width / 3, 0, -100);                     /* bottom-left */
-    } glEnd();
-    
-    /* Display the point cloud */
-    glBindTexture(GL_TEXTURE_2D, textures[3]);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_main_engine->view_size().x, g_main_engine->view_size().y,
-                 0, GL_RGBA, GL_UNSIGNED_BYTE, g_pcl_image->GetData());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glBegin(GL_QUADS); {
-      glTexCoord2f(0, 0); glVertex3f(g_win_width, g_win_height / 3 * 2, -100);                        /* top-left */
-      glTexCoord2f(1, 0); glVertex3f(g_win_width + g_win_width / 3 * 2, g_win_height / 3 * 2, -100);  /* top-right */
-      glTexCoord2f(1, 1); glVertex3f(g_win_width + g_win_width / 3 * 2, 0, -100);                     /* bottom-right */
-      glTexCoord2f(0, 1); glVertex3f(g_win_width, 0, -100);                                           /* bottom-left */
     } glEnd();
     
     /* Display view pyramid */
@@ -229,11 +218,20 @@ void DisplayFunc1() {
     
     glColor3f(1, 0, 0);
     glPushMatrix(); {
-      glTranslatef(g_main_engine->camera_pose()->t().x / gVoxelMetricSize,
-                   g_main_engine->camera_pose()->t().y / gVoxelMetricSize,
-                   g_main_engine->camera_pose()->t().z / gVoxelMetricSize);
-      glutWireSphere(10, 20, 20);
+      glTranslatef(g_camera_poses.front().x / gVoxelMetricSize,
+                   g_camera_poses.front().y / gVoxelMetricSize,
+                   g_camera_poses.front().z / gVoxelMetricSize);
+      glutWireSphere(g_scale, 10, 10);
     } glPopMatrix();
+    glColor3f(0.5, 0.5, 0.5);
+    for (auto it = g_camera_poses.cbegin() + 1; it != g_camera_poses.cend(); ++it) {
+      glPushMatrix(); {
+        glTranslatef(it->x / gVoxelMetricSize,
+                     it->y / gVoxelMetricSize,
+                     it->z / gVoxelMetricSize);
+        glutWireSphere(g_scale, 10, 10);
+      } glPopMatrix();
+    }
     
     glScalef(g_scale / gVoxelMetricSize, g_scale / gVoxelMetricSize, g_scale / gVoxelMetricSize);
     
@@ -427,6 +425,7 @@ void IdleFunc() {
         g_main_engine->camera_pose()->m,
         g_pcl_image);
     g_stalled = true;
+    g_camera_poses.push_back(g_main_engine->camera_pose()->t());
   }
 
   glutPostRedisplay();

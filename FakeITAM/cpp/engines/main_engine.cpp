@@ -110,9 +110,6 @@ void MainEngine::ProcessOneFrame() throw(std::runtime_error) {
   LOG->WriteLineF("\033[31;1m\t%.2fms\033[0m", ms=((t=clock())-start)*1000.0/CLOCKS_PER_SEC);
   total_ms += ms; start = t;
 
-  //ms=-((t=start)-(start=clock()))*1000.0/CLOCKS_PER_SEC;
-  //ms=()*1000.0/CLOCKS_PER_SEC;
-
   /* Step 2: Construct current "View" */
   LOG->Write(I, "constructing the current view ... ... ... ");
   view_->SetRGBDFrame(rgb_frame, raw_disparity_map);
